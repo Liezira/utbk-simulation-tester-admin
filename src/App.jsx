@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle } from 'lucide-react';
+import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, deleteField } from 'firebase/firestore'; 
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 const SUBTESTS = [
@@ -61,6 +61,34 @@ const UTBKAdminApp = () => {
 
   const handleLogin = async (e) => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, adminEmail, adminPassword); setScreen('dashboard'); loadTokens(); } catch (error) { alert('Login Gagal.'); } };
   const handleLogout = async () => { await signOut(auth); setScreen('admin_login'); };
+
+  // --- FITUR BARU: RESET LEADERBOARD (HAPUS SKOR SAJA) ---
+  const resetLeaderboard = async () => {
+    if (!confirm("⚠️ PERINGATAN: Ini akan MENGHAPUS SEMUA SKOR siswa!\n\nToken tidak akan terhapus, tapi siswa akan hilang dari Leaderboard.\nApakah Anda yakin?")) return;
+    
+    try {
+        const querySnapshot = await getDocs(collection(db, 'tokens'));
+        const updates = [];
+        
+        querySnapshot.forEach((docSnap) => {
+             // Hapus field score, finalTimeLeft, dan finishedAt
+             if (docSnap.data().score !== undefined) {
+                 updates.push(updateDoc(docSnap.ref, {
+                     score: deleteField(),
+                     finalTimeLeft: deleteField(),
+                     finishedAt: deleteField()
+                 }));
+             }
+        });
+        
+        await Promise.all(updates);
+        alert("✅ Leaderboard berhasil di-reset!");
+        loadTokens();
+    } catch (error) {
+        console.error(error);
+        alert("Gagal reset leaderboard.");
+    }
+  };
 
   // --- FUNGSI UPDATE STATUS PENGIRIMAN KE DB ---
   const markAsSent = async (tokenCode, method) => {
@@ -163,7 +191,7 @@ const UTBKAdminApp = () => {
   const deleteToken = async (code) => { if(confirm('Hapus token ini?')) { await deleteDoc(doc(db, 'tokens', code)); loadTokens(); }};
   const deleteAllTokens = async () => { if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; try { await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); alert("Semua terhapus."); loadTokens(); } catch (error) { alert("Gagal."); } };
 
-  // --- LOGIC STATISTIK & FILTER (SUDAH DIKEMBALIKAN) ---
+  // --- LOGIC STATISTIK & FILTER (TETAP ADA) ---
   const isExpired = (createdAt) => (Date.now() - new Date(createdAt).getTime()) > 24 * 60 * 60 * 1000;
   const activeTokens = tokenList.filter(t => t.status === 'active' && !isExpired(t.createdAt));
   const usedTokens = tokenList.filter(t => t.status === 'used');
@@ -257,7 +285,7 @@ const UTBKAdminApp = () => {
 
             <div className="md:col-span-2 space-y-4">
               
-              {/* --- STATISTIK DASHBOARD (SUDAH DIKEMBALIKAN) --- */}
+              {/* --- STATISTIK DASHBOARD --- */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <button onClick={() => setFilterStatus('all')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                   <p className="text-xs text-gray-500 uppercase font-bold">Total</p>
@@ -282,7 +310,17 @@ const UTBKAdminApp = () => {
               {/* ----------------------------------------------- */}
 
               <div className="bg-white p-6 rounded-xl shadow">
-                <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-lg">List Token</h2><div className="flex gap-2"><button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>{tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}</div></div>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="font-bold text-lg">List Token</h2>
+                    <div className="flex gap-2">
+                         {/* TOMBOL RESET LEADERBOARD (BARU) */}
+                         <button onClick={resetLeaderboard} className="text-orange-600 text-sm font-bold flex items-center gap-1 border border-orange-200 bg-orange-50 px-2 py-1 rounded hover:bg-orange-100">
+                           <RefreshCw size={14}/> Reset Scores
+                        </button>
+                        <button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>
+                        {tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}
+                    </div>
+                </div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 sticky top-0">
