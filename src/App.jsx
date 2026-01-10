@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright } from 'lucide-react';
+import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, Radio } from 'lucide-react';
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -14,11 +14,17 @@ const SUBTESTS = [
   { id: 'pm', name: 'Penalaran Matematika', questions: 20 },
 ];
 
+// --- KONFIGURASI PENTING ---
+const STUDENT_APP_URL = "https://utbk-simulation-tester-student.vercel.app"; 
+const FONNTE_TOKEN = import.meta.env.VITE_FONNTE_TOKEN; 
+const SEND_DELAY = 3; 
+
 const UTBKAdminApp = () => {
   const [screen, setScreen] = useState('admin_login'); 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [viewMode, setViewMode] = useState('tokens');
+  
   const [tokenList, setTokenList] = useState([]);
   const [bankSoal, setBankSoal] = useState({});
   const [filterStatus, setFilterStatus] = useState('all');
@@ -31,6 +37,7 @@ const UTBKAdminApp = () => {
   const [options, setOptions] = useState(['', '', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState('A');
   const [editingId, setEditingId] = useState(null);
+  const [isSending, setIsSending] = useState(false); // Status loading kirim WA
 
   useEffect(() => {
     const loadBankSoal = async () => {
@@ -51,10 +58,69 @@ const UTBKAdminApp = () => {
   const handleLogin = async (e) => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, adminEmail, adminPassword); setScreen('dashboard'); loadTokens(); } catch (error) { alert('Login Gagal.'); } };
   const handleLogout = async () => { await signOut(auth); setScreen('admin_login'); };
 
+  // --- LOGIC KIRIM FONNTE (METODE GET + NO-CORS) ---
+  const sendFonnteMessage = async (name, phone, token) => {
+    // 1. Cek Token
+    if (!FONNTE_TOKEN) {
+        alert("ERROR: Token Fonnte belum terbaca! Pastikan file .env sudah dibuat dan server di-restart.");
+        return;
+    }
+
+    setIsSending(true);
+
+    // 2. Format Nomor (08 -> 628)
+    let formattedPhone = phone.toString().replace(/\D/g, '');
+    if (formattedPhone.startsWith('0')) {
+        formattedPhone = '62' + formattedPhone.slice(1);
+    }
+
+    // 3. Siapkan Pesan
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\nSelamat mengerjakan!`;
+
+    try {
+        const params = new URLSearchParams({
+            token: FONNTE_TOKEN,
+            target: formattedPhone,
+            message: message,
+            delay: SEND_DELAY,
+            countryCode: '62'
+        });
+
+        await fetch(`https://api.fonnte.com/send?${params.toString()}`, {
+            method: 'GET',
+            mode: 'no-cors' 
+        });
+
+        alert(`✅ Request terkirim ke ${name}! (Cek WA Tujuan)`);
+
+    } catch (error) {
+        console.error(error);
+        alert("❌ Error koneksi internet atau Fonnte down.");
+    } finally {
+        setIsSending(false);
+    }
+  };
+
   const createToken = async () => {
     if (!newTokenName || !newTokenPhone) { alert('Isi Nama & HP!'); return; }
     const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    try { await setDoc(doc(db, 'tokens', tokenCode), { tokenCode, studentName: newTokenName, studentPhone: newTokenPhone, status: 'active', createdAt: new Date().toISOString(), }); alert(`Token: ${tokenCode}`); setNewTokenName(''); setNewTokenPhone(''); loadTokens(); } catch (error) { alert('Gagal.'); }
+    
+    try { 
+        await setDoc(doc(db, 'tokens', tokenCode), { 
+            tokenCode, 
+            studentName: newTokenName, 
+            studentPhone: newTokenPhone, 
+            status: 'active', 
+            createdAt: new Date().toISOString(), 
+        });
+        
+        // Auto Send Prompt
+        if(confirm(`Token Berhasil: ${tokenCode}\n\nKirim WhatsApp Otomatis ke ${newTokenPhone}?`)) {
+            await sendFonnteMessage(newTokenName, newTokenPhone, tokenCode);
+        }
+        
+        setNewTokenName(''); setNewTokenPhone(''); loadTokens(); 
+    } catch (error) { alert('Gagal generate token.'); }
   };
 
   const loadTokens = async () => { const s = await getDocs(collection(db, 'tokens')); const t = []; s.forEach((d) => t.push(d.data())); t.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); setTokenList(t); };
@@ -89,7 +155,6 @@ const UTBKAdminApp = () => {
             <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full p-3 border rounded" placeholder="Password" required />
             <button className="w-full bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700">Masuk</button>
           </form>
-          {/* Copyright Login */}
           <div className="mt-8 text-center text-xs text-gray-400 font-mono">© {new Date().getFullYear()} Liezira</div>
         </div>
       </div>
@@ -112,7 +177,13 @@ const UTBKAdminApp = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-xl shadow h-fit">
               <h2 className="font-bold mb-4 flex items-center gap-2"><Plus size={18}/> Buat Token</h2>
-              <div className="space-y-4"><input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-2 border rounded" placeholder="Nama Siswa"/><input value={newTokenPhone} onChange={e=>setNewTokenPhone(e.target.value)} className="w-full p-2 border rounded" placeholder="No HP"/><button onClick={createToken} className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 transition">Generate</button></div>
+              <div className="space-y-4">
+                <input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-2 border rounded" placeholder="Nama Siswa"/>
+                <input value={newTokenPhone} onChange={e=>setNewTokenPhone(e.target.value)} className="w-full p-2 border rounded" placeholder="No WhatsApp (08xxx)"/>
+                <button onClick={createToken} disabled={isSending} className={`w-full py-2 rounded transition text-white ${isSending ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                    {isSending ? 'Mengirim WA...' : 'Generate & Kirim WA'}
+                </button>
+              </div>
             </div>
             <div className="md:col-span-2 space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -125,7 +196,17 @@ const UTBKAdminApp = () => {
                 <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-lg">List Token</h2><div className="flex gap-2"><button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>{tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}</div></div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                   <table className="w-full text-sm text-left"><thead className="bg-gray-50 sticky top-0"><tr><th className="p-2">Kode</th><th className="p-2">Nama</th><th className="p-2">Status</th><th className="p-2">Aksi</th></tr></thead>
-                    <tbody>{getFilteredList().map(t=>(<tr key={t.tokenCode} className="border-b"><td className="p-2 font-mono text-indigo-600 font-bold">{t.tokenCode}</td><td className="p-2">{t.studentName}<div className="text-xs text-gray-400">{t.studentPhone}</div></td><td className="p-2">{isExpired(t.createdAt)?<span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">EXPIRED</span>:<span className={`px-2 py-1 rounded text-xs font-bold ${t.status==='active'?'bg-green-100 text-green-700':'bg-gray-200'}`}>{t.status.toUpperCase()}</span>}</td><td className="p-2"><button onClick={()=>deleteToken(t.tokenCode)} className="text-red-500"><Trash2 size={16}/></button></td></tr>))}</tbody></table>
+                    <tbody>{getFilteredList().map(t=>(<tr key={t.tokenCode} className="border-b"><td className="p-2 font-mono text-indigo-600 font-bold">{t.tokenCode}</td><td className="p-2">{t.studentName}<div className="text-xs text-gray-400">{t.studentPhone}</div></td><td className="p-2">{isExpired(t.createdAt)?<span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">EXPIRED</span>:<span className={`px-2 py-1 rounded text-xs font-bold ${t.status==='active'?'bg-green-100 text-green-700':'bg-gray-200'}`}>{t.status.toUpperCase()}</span>}</td>
+                    
+                    {/* BUTTON ACTIONS FONNTE */}
+                    <td className="p-2 flex gap-2">
+                        <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="text-green-600 hover:text-green-800 bg-green-100 p-1.5 rounded border border-green-300" title="Resend WA">
+                            <Send size={16}/>
+                        </button>
+                        <button onClick={()=>deleteToken(t.tokenCode)} className="text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded border border-red-200"><Trash2 size={16}/></button>
+                    </td>
+                    
+                    </tr>))}</tbody></table>
                 </div>
               </div>
             </div>
@@ -145,7 +226,6 @@ const UTBKAdminApp = () => {
         )}
       </div>
       
-      {/* COPYRIGHT FOOTER LIEZIRA */}
       <div className="py-6 bg-white border-t border-gray-200 w-full text-center">
         <p className="text-gray-400 text-xs font-mono flex items-center justify-center gap-1">
           <Copyright size={12} /> {new Date().getFullYear()} Created by <span className="font-bold text-indigo-500">Liezira</span>
