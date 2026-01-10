@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, Radio } from 'lucide-react';
+import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle } from 'lucide-react';
 import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 const SUBTESTS = [
@@ -14,7 +14,7 @@ const SUBTESTS = [
   { id: 'pm', name: 'Penalaran Matematika', questions: 20 },
 ];
 
-// --- KONFIGURASI PENTING ---
+// --- KONFIGURASI ENV ---
 const STUDENT_APP_URL = "https://utbk-simulation-tester-student.vercel.app"; 
 const FONNTE_TOKEN = import.meta.env.VITE_FONNTE_TOKEN; 
 const SEND_DELAY = 3; 
@@ -31,13 +31,17 @@ const UTBKAdminApp = () => {
   
   const [newTokenName, setNewTokenName] = useState('');
   const [newTokenPhone, setNewTokenPhone] = useState('');
+  
+  // MODE: 'fonnte' | 'js_app' | 'manual_web'
+  const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
+
   const [selectedSubtest, setSelectedSubtest] = useState('pu');
   const [questionText, setQuestionText] = useState('');
   const [questionImage, setQuestionImage] = useState('');
   const [options, setOptions] = useState(['', '', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState('A');
   const [editingId, setEditingId] = useState(null);
-  const [isSending, setIsSending] = useState(false); // Status loading kirim WA
+  const [isSending, setIsSending] = useState(false); 
 
   useEffect(() => {
     const loadBankSoal = async () => {
@@ -58,24 +62,30 @@ const UTBKAdminApp = () => {
   const handleLogin = async (e) => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, adminEmail, adminPassword); setScreen('dashboard'); loadTokens(); } catch (error) { alert('Login Gagal.'); } };
   const handleLogout = async () => { await signOut(auth); setScreen('admin_login'); };
 
-  // --- LOGIC KIRIM FONNTE (METODE GET + NO-CORS) ---
-  const sendFonnteMessage = async (name, phone, token) => {
-    // 1. Cek Token
-    if (!FONNTE_TOKEN) {
-        alert("ERROR: Token Fonnte belum terbaca! Pastikan file .env sudah dibuat dan server di-restart.");
-        return;
+  // --- FUNGSI UPDATE STATUS PENGIRIMAN KE DB ---
+  const markAsSent = async (tokenCode, method) => {
+    try {
+        const tokenRef = doc(db, 'tokens', tokenCode);
+        await updateDoc(tokenRef, {
+            isSent: true,
+            sentMethod: method, // 'Fonnte', 'JS App', 'Manual Web'
+            sentAt: new Date().toISOString()
+        });
+        loadTokens(); // Refresh tabel biar status muncul
+    } catch (error) {
+        console.error("Gagal update status sent:", error);
     }
+  };
 
+  // 1. ENGINE UTAMA (FONNTE - API)
+  const sendFonnteMessage = async (name, phone, token) => {
+    if (!FONNTE_TOKEN) { alert("Token Fonnte Kosong!"); return; }
     setIsSending(true);
 
-    // 2. Format Nomor (08 -> 628)
     let formattedPhone = phone.toString().replace(/\D/g, '');
-    if (formattedPhone.startsWith('0')) {
-        formattedPhone = '62' + formattedPhone.slice(1);
-    }
+    if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
 
-    // 3. Siapkan Pesan
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam setelah dibuat.\n\nSelamat mengerjakan!`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
 
     try {
         const params = new URLSearchParams({
@@ -85,20 +95,45 @@ const UTBKAdminApp = () => {
             delay: SEND_DELAY,
             countryCode: '62'
         });
-
-        await fetch(`https://api.fonnte.com/send?${params.toString()}`, {
-            method: 'GET',
-            mode: 'no-cors' 
-        });
-
-        alert(`✅ Request terkirim ke ${name}! (Cek WA Tujuan)`);
-
+        await fetch(`https://api.fonnte.com/send?${params.toString()}`, { method: 'GET', mode: 'no-cors' });
+        
+        // Update Status di Database
+        await markAsSent(token, 'Fonnte (Auto)');
+        
+        alert(`✅ (FONNTE) Pesan dikirim ke ${name}`);
     } catch (error) {
-        console.error(error);
-        alert("❌ Error koneksi internet atau Fonnte down.");
+        console.error(error); alert("❌ Gagal Kirim Fonnte.");
     } finally {
         setIsSending(false);
     }
+  };
+
+  // 2. ENGINE JS DIRECT (WHATSAPP PROTOCOL)
+  const sendJsDirect = async (name, phone, token) => {
+    let formattedPhone = phone.toString().replace(/\D/g, '');
+    if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
+
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
+
+    // Protocol 'whatsapp://' membuka aplikasi langsung tanpa loading browser
+    window.location.href = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
+    
+    // Asumsikan terkirim karena aplikasi terbuka
+    await markAsSent(token, 'JS App (Direct)');
+  };
+
+  // 3. ENGINE MANUAL (WA WEB)
+  const sendManualWeb = async (name, phone, token) => {
+    let formattedPhone = phone.toString().replace(/\D/g, '');
+    if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
+
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
+    
+    // Buka Tab Baru
+    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
+    
+    // Update Status
+    await markAsSent(token, 'WA Web (Manual)');
   };
 
   const createToken = async () => {
@@ -111,15 +146,26 @@ const UTBKAdminApp = () => {
             studentName: newTokenName, 
             studentPhone: newTokenPhone, 
             status: 'active', 
-            createdAt: new Date().toISOString(), 
+            createdAt: new Date().toISOString(),
+            isSent: false, // Default belum terkirim
+            sentMethod: '-' 
         });
         
-        // Auto Send Prompt
-        if(confirm(`Token Berhasil: ${tokenCode}\n\nKirim WhatsApp Otomatis ke ${newTokenPhone}?`)) {
-            await sendFonnteMessage(newTokenName, newTokenPhone, tokenCode);
+        let modeLabel = "";
+        if (autoSendMode === 'fonnte') modeLabel = "AUTOMATIC (Fonnte)";
+        else if (autoSendMode === 'js_app') modeLabel = "JS DIRECT (App)";
+        else modeLabel = "MANUAL (Web)";
+        
+        if(confirm(`Token Berhasil: ${tokenCode}\n\nKirim via Jalur ${modeLabel}?`)) {
+            if (autoSendMode === 'fonnte') await sendFonnteMessage(newTokenName, newTokenPhone, tokenCode);
+            else if (autoSendMode === 'js_app') await sendJsDirect(newTokenName, newTokenPhone, tokenCode);
+            else await sendManualWeb(newTokenName, newTokenPhone, tokenCode);
+        } else {
+            // Kalau user cancel kirim, cuma reload
+            loadTokens();
         }
         
-        setNewTokenName(''); setNewTokenPhone(''); loadTokens(); 
+        setNewTokenName(''); setNewTokenPhone(''); 
     } catch (error) { alert('Gagal generate token.'); }
   };
 
@@ -177,36 +223,94 @@ const UTBKAdminApp = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-xl shadow h-fit">
               <h2 className="font-bold mb-4 flex items-center gap-2"><Plus size={18}/> Buat Token</h2>
+              
+              {/* --- 3 JALUR SENDING CONFIG --- */}
+              <div className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <p className="text-xs font-bold text-gray-500 mb-2 uppercase flex items-center gap-1"><Settings size={12}/> Metode Kirim Default:</p>
+                <div className="flex flex-col gap-2">
+                    <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'fonnte' ? 'bg-green-100 border-green-400 text-green-700 ring-1 ring-green-400' : 'bg-white border-gray-300 text-gray-500'}`}>
+                        <input type="radio" name="sendMode" value="fonnte" checked={autoSendMode === 'fonnte'} onChange={() => setAutoSendMode('fonnte')} className="hidden" />
+                        <Zap size={14} className={autoSendMode==='fonnte' ? "fill-green-600" : ""}/> 1. Auto (Fonnte API)
+                    </label>
+                    
+                    <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'manual_web' ? 'bg-blue-100 border-blue-400 text-blue-700 ring-1 ring-blue-400' : 'bg-white border-gray-300 text-gray-500'}`}>
+                        <input type="radio" name="sendMode" value="manual_web" checked={autoSendMode === 'manual_web'} onChange={() => setAutoSendMode('manual_web')} className="hidden" />
+                        <ExternalLink size={14}/> 2. Manual (WA Web)
+                    </label>
+
+                    <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'js_app' ? 'bg-purple-100 border-purple-400 text-purple-700 ring-1 ring-purple-400' : 'bg-white border-gray-300 text-gray-500'}`}>
+                        <input type="radio" name="sendMode" value="js_app" checked={autoSendMode === 'js_app'} onChange={() => setAutoSendMode('js_app')} className="hidden" />
+                        <Smartphone size={14}/> 3. JS Direct (App)
+                    </label>
+                </div>
+              </div>
+              {/* ----------------------------- */}
+
               <div className="space-y-4">
                 <input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-2 border rounded" placeholder="Nama Siswa"/>
                 <input value={newTokenPhone} onChange={e=>setNewTokenPhone(e.target.value)} className="w-full p-2 border rounded" placeholder="No WhatsApp (08xxx)"/>
-                <button onClick={createToken} disabled={isSending} className={`w-full py-2 rounded transition text-white ${isSending ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-                    {isSending ? 'Mengirim WA...' : 'Generate & Kirim WA'}
+                
+                <button onClick={createToken} disabled={isSending} className={`w-full py-2 rounded transition text-white font-bold flex items-center justify-center gap-2 ${isSending ? 'bg-gray-400' : autoSendMode === 'fonnte' ? 'bg-green-600 hover:bg-green-700' : autoSendMode === 'js_app' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                    {isSending ? 'Mengirim...' : 'Generate & Kirim'}
                 </button>
               </div>
             </div>
+
             <div className="md:col-span-2 space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <button onClick={() => setFilterStatus('all')} className={`p-3 rounded-lg border text-center ${filterStatus==='all'?'bg-indigo-50 border-indigo-500':'bg-white'}`}><p className="text-xs text-gray-500 font-bold">Total</p><p className="text-2xl font-bold">{tokenList.length}</p></button>
-                <button onClick={() => setFilterStatus('active')} className={`p-3 rounded-lg border text-center ${filterStatus==='active'?'bg-green-50 border-green-500':'bg-white'}`}><p className="text-xs text-green-600 font-bold">Aktif</p><p className="text-2xl font-bold">{activeTokens.length}</p></button>
-                <button onClick={() => setFilterStatus('used')} className={`p-3 rounded-lg border text-center ${filterStatus==='used'?'bg-gray-100 border-gray-500':'bg-white'}`}><p className="text-xs text-gray-600 font-bold">Terpakai</p><p className="text-2xl font-bold">{usedTokens.length}</p></button>
-                <button onClick={() => setFilterStatus('expired')} className={`p-3 rounded-lg border text-center ${filterStatus==='expired'?'bg-red-50 border-red-500':'bg-white'}`}><p className="text-xs text-red-600 font-bold">Expired</p><p className="text-2xl font-bold">{expiredTokens.length}</p></button>
-              </div>
+              {/* --- STATUS TABLE --- */}
               <div className="bg-white p-6 rounded-xl shadow">
                 <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-lg">List Token</h2><div className="flex gap-2"><button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>{tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}</div></div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-                  <table className="w-full text-sm text-left"><thead className="bg-gray-50 sticky top-0"><tr><th className="p-2">Kode</th><th className="p-2">Nama</th><th className="p-2">Status</th><th className="p-2">Aksi</th></tr></thead>
-                    <tbody>{getFilteredList().map(t=>(<tr key={t.tokenCode} className="border-b"><td className="p-2 font-mono text-indigo-600 font-bold">{t.tokenCode}</td><td className="p-2">{t.studentName}<div className="text-xs text-gray-400">{t.studentPhone}</div></td><td className="p-2">{isExpired(t.createdAt)?<span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">EXPIRED</span>:<span className={`px-2 py-1 rounded text-xs font-bold ${t.status==='active'?'bg-green-100 text-green-700':'bg-gray-200'}`}>{t.status.toUpperCase()}</span>}</td>
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th className="p-2">Kode</th>
+                            <th className="p-2">Nama</th>
+                            <th className="p-2">Status Token</th>
+                            <th className="p-2">Status Kirim</th> {/* KOLOM BARU */}
+                            <th className="p-2 text-center">Opsi Kirim</th>
+                            <th className="p-2 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>{getFilteredList().map(t=>(<tr key={t.tokenCode} className="border-b">
+                        <td className="p-2 font-mono text-indigo-600 font-bold">{t.tokenCode}</td>
+                        <td className="p-2">{t.studentName}<div className="text-xs text-gray-400">{t.studentPhone}</div></td>
+                        <td className="p-2">{isExpired(t.createdAt)?<span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">EXPIRED</span>:<span className={`px-2 py-1 rounded text-xs font-bold ${t.status==='active'?'bg-green-100 text-green-700':'bg-gray-200'}`}>{t.status.toUpperCase()}</span>}</td>
+                        
+                        {/* INDIKATOR STATUS TERKIRIM */}
+                        <td className="p-2">
+                            {t.isSent ? (
+                                <div className="flex flex-col">
+                                    <span className="flex items-center gap-1 text-green-600 font-bold text-xs"><CheckCircle2 size={12}/> Terkirim</span>
+                                    <span className="text-[10px] text-gray-400">{t.sentMethod}</span>
+                                </div>
+                            ) : (
+                                <span className="flex items-center gap-1 text-gray-400 text-xs"><XCircle size={12}/> Belum</span>
+                            )}
+                        </td>
                     
-                    {/* BUTTON ACTIONS FONNTE */}
-                    <td className="p-2 flex gap-2">
-                        <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="text-green-600 hover:text-green-800 bg-green-100 p-1.5 rounded border border-green-300" title="Resend WA">
-                            <Send size={16}/>
-                        </button>
-                        <button onClick={()=>deleteToken(t.tokenCode)} className="text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded border border-red-200"><Trash2 size={16}/></button>
-                    </td>
+                        {/* 3 JALUR TOMBOL */}
+                        <td className="p-2 flex gap-2 justify-center">
+                            <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} 
+                                className="bg-green-50 text-green-700 p-1.5 rounded border border-green-200 hover:bg-green-100" title="Auto (Fonnte)">
+                                <Zap size={16}/>
+                            </button>
+                            <button onClick={() => sendManualWeb(t.studentName, t.studentPhone, t.tokenCode)} 
+                                className="bg-blue-50 text-blue-700 p-1.5 rounded border border-blue-200 hover:bg-blue-100" title="Manual (Web)">
+                                <ExternalLink size={16}/>
+                            </button>
+                            <button onClick={() => sendJsDirect(t.studentName, t.studentPhone, t.tokenCode)} 
+                                className="bg-purple-50 text-purple-700 p-1.5 rounded border border-purple-200 hover:bg-purple-100" title="Direct (App)">
+                                <Smartphone size={16}/>
+                            </button>
+                        </td>
+
+                        <td className="p-2 text-center">
+                            <button onClick={()=>deleteToken(t.tokenCode)} className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded border border-red-200"><Trash2 size={16}/></button>
+                        </td>
                     
-                    </tr>))}</tbody></table>
+                    </tr>))}</tbody>
+                  </table>
                 </div>
               </div>
             </div>
