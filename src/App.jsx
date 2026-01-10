@@ -68,10 +68,10 @@ const UTBKAdminApp = () => {
         const tokenRef = doc(db, 'tokens', tokenCode);
         await updateDoc(tokenRef, {
             isSent: true,
-            sentMethod: method, // 'Fonnte', 'JS App', 'Manual Web'
+            sentMethod: method, 
             sentAt: new Date().toISOString()
         });
-        loadTokens(); // Refresh tabel biar status muncul
+        loadTokens(); 
     } catch (error) {
         console.error("Gagal update status sent:", error);
     }
@@ -96,10 +96,7 @@ const UTBKAdminApp = () => {
             countryCode: '62'
         });
         await fetch(`https://api.fonnte.com/send?${params.toString()}`, { method: 'GET', mode: 'no-cors' });
-        
-        // Update Status di Database
         await markAsSent(token, 'Fonnte (Auto)');
-        
         alert(`✅ (FONNTE) Pesan dikirim ke ${name}`);
     } catch (error) {
         console.error(error); alert("❌ Gagal Kirim Fonnte.");
@@ -115,10 +112,7 @@ const UTBKAdminApp = () => {
 
     const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
 
-    // Protocol 'whatsapp://' membuka aplikasi langsung tanpa loading browser
     window.location.href = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
-    
-    // Asumsikan terkirim karena aplikasi terbuka
     await markAsSent(token, 'JS App (Direct)');
   };
 
@@ -129,10 +123,7 @@ const UTBKAdminApp = () => {
 
     const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
     
-    // Buka Tab Baru
     window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
-    
-    // Update Status
     await markAsSent(token, 'WA Web (Manual)');
   };
 
@@ -147,7 +138,7 @@ const UTBKAdminApp = () => {
             studentPhone: newTokenPhone, 
             status: 'active', 
             createdAt: new Date().toISOString(),
-            isSent: false, // Default belum terkirim
+            isSent: false, 
             sentMethod: '-' 
         });
         
@@ -161,7 +152,6 @@ const UTBKAdminApp = () => {
             else if (autoSendMode === 'js_app') await sendJsDirect(newTokenName, newTokenPhone, tokenCode);
             else await sendManualWeb(newTokenName, newTokenPhone, tokenCode);
         } else {
-            // Kalau user cancel kirim, cuma reload
             loadTokens();
         }
         
@@ -173,11 +163,21 @@ const UTBKAdminApp = () => {
   const deleteToken = async (code) => { if(confirm('Hapus token ini?')) { await deleteDoc(doc(db, 'tokens', code)); loadTokens(); }};
   const deleteAllTokens = async () => { if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; try { await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); alert("Semua terhapus."); loadTokens(); } catch (error) { alert("Gagal."); } };
 
+  // --- LOGIC STATISTIK & FILTER (SUDAH DIKEMBALIKAN) ---
   const isExpired = (createdAt) => (Date.now() - new Date(createdAt).getTime()) > 24 * 60 * 60 * 1000;
   const activeTokens = tokenList.filter(t => t.status === 'active' && !isExpired(t.createdAt));
   const usedTokens = tokenList.filter(t => t.status === 'used');
   const expiredTokens = tokenList.filter(t => isExpired(t.createdAt));
-  const getFilteredList = () => { switch (filterStatus) { case 'active': return activeTokens; case 'used': return usedTokens; case 'expired': return expiredTokens; default: return tokenList; } };
+  
+  const getFilteredList = () => { 
+      switch (filterStatus) { 
+          case 'active': return activeTokens; 
+          case 'used': return usedTokens; 
+          case 'expired': return expiredTokens; 
+          default: return tokenList; 
+      } 
+  };
+  // -----------------------------------------------------
 
   const saveSoal = async (sid, q) => { await setDoc(doc(db, 'bank_soal', sid), { questions: q }); setBankSoal(p => ({ ...p, [sid]: q })); };
   const addOrUpdate = async () => {
@@ -244,7 +244,6 @@ const UTBKAdminApp = () => {
                     </label>
                 </div>
               </div>
-              {/* ----------------------------- */}
 
               <div className="space-y-4">
                 <input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-2 border rounded" placeholder="Nama Siswa"/>
@@ -257,7 +256,31 @@ const UTBKAdminApp = () => {
             </div>
 
             <div className="md:col-span-2 space-y-4">
-              {/* --- STATUS TABLE --- */}
+              
+              {/* --- STATISTIK DASHBOARD (SUDAH DIKEMBALIKAN) --- */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <button onClick={() => setFilterStatus('all')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                  <p className="text-xs text-gray-500 uppercase font-bold">Total</p>
+                  <p className="text-2xl font-bold text-gray-800">{tokenList.length}</p>
+                </button>
+
+                <button onClick={() => setFilterStatus('active')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'active' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                  <p className="text-xs text-green-600 uppercase font-bold">Aktif</p>
+                  <p className="text-2xl font-bold text-green-700">{activeTokens.length}</p>
+                </button>
+
+                <button onClick={() => setFilterStatus('used')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'used' ? 'bg-gray-100 border-gray-500 ring-2 ring-gray-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                  <p className="text-xs text-gray-600 uppercase font-bold">Terpakai</p>
+                  <p className="text-2xl font-bold text-gray-700">{usedTokens.length}</p>
+                </button>
+
+                <button onClick={() => setFilterStatus('expired')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'expired' ? 'bg-red-50 border-red-500 ring-2 ring-red-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                  <p className="text-xs text-red-600 uppercase font-bold">Expired</p>
+                  <p className="text-2xl font-bold text-red-700">{expiredTokens.length}</p>
+                </button>
+              </div>
+              {/* ----------------------------------------------- */}
+
               <div className="bg-white p-6 rounded-xl shadow">
                 <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-lg">List Token</h2><div className="flex gap-2"><button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>{tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}</div></div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
@@ -266,9 +289,9 @@ const UTBKAdminApp = () => {
                         <tr>
                             <th className="p-2">Kode</th>
                             <th className="p-2">Nama</th>
-                            <th className="p-2">Status Token</th>
-                            <th className="p-2">Status Kirim</th> {/* KOLOM BARU */}
-                            <th className="p-2 text-center">Opsi Kirim</th>
+                            <th className="p-2">Status</th>
+                            <th className="p-2">Kirim</th>
+                            <th className="p-2 text-center">Opsi</th>
                             <th className="p-2 text-center">Aksi</th>
                         </tr>
                     </thead>
@@ -277,7 +300,7 @@ const UTBKAdminApp = () => {
                         <td className="p-2">{t.studentName}<div className="text-xs text-gray-400">{t.studentPhone}</div></td>
                         <td className="p-2">{isExpired(t.createdAt)?<span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">EXPIRED</span>:<span className={`px-2 py-1 rounded text-xs font-bold ${t.status==='active'?'bg-green-100 text-green-700':'bg-gray-200'}`}>{t.status.toUpperCase()}</span>}</td>
                         
-                        {/* INDIKATOR STATUS TERKIRIM */}
+                        {/* STATUS TRACKER */}
                         <td className="p-2">
                             {t.isSent ? (
                                 <div className="flex flex-col">
