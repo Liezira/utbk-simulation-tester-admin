@@ -75,7 +75,7 @@ const UTBKAdminApp = () => {
     }
 
     // 3. Siapkan Pesan
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\nSelamat mengerjakan!`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam setelah dibuat.\n\nSelamat mengerjakan!`;
 
     try {
         const params = new URLSearchParams({
