@@ -1,48 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
-import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, deleteField } from 'firebase/firestore'; 
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { Clock, Ticket, AlertCircle, CheckCircle, XCircle, ShieldAlert, Timer, Trophy, Copyright } from 'lucide-react';
+import { db } from './firebase'; 
+import { doc, getDoc, updateDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 
 const SUBTESTS = [
-  { id: 'pu', name: 'Penalaran Umum', questions: 30 },
-  { id: 'ppu', name: 'Pengetahuan & Pemahaman Umum', questions: 20 },
-  { id: 'pbm', name: 'Pemahaman Bacaan & Menulis', questions: 20 },
-  { id: 'pk', name: 'Pengetahuan Kuantitatif', questions: 15 },
-  { id: 'lbi', name: 'Literasi Bahasa Indonesia', questions: 30 },
-  { id: 'lbe', name: 'Literasi Bahasa Inggris', questions: 20 },
-  { id: 'pm', name: 'Penalaran Matematika', questions: 20 },
+  { id: 'pu', name: 'Penalaran Umum', questions: 30, time: 30 },
+  { id: 'ppu', name: 'Pengetahuan & Pemahaman Umum', questions: 20, time: 15 },
+  { id: 'pbm', name: 'Pemahaman Bacaan & Menulis', questions: 20, time: 25 },
+  { id: 'pk', name: 'Pengetahuan Kuantitatif', questions: 15, time: 20 },
+  { id: 'lbi', name: 'Literasi Bahasa Indonesia', questions: 30, time: 45 },
+  { id: 'lbe', name: 'Literasi Bahasa Inggris', questions: 20, time: 30 },
+  { id: 'pm', name: 'Penalaran Matematika', questions: 20, time: 30 },
 ];
 
-// --- KONFIGURASI ENV ---
-const STUDENT_APP_URL = "https://utbk-simulation-tester-student.vercel.app"; 
-const FONNTE_TOKEN = import.meta.env.VITE_FONNTE_TOKEN; 
-const SEND_DELAY = 3; 
+const UTBKStudentApp = () => {
+  const [screen, setScreen] = useState('landing');
+  const [studentName, setStudentName] = useState('');
+  const [inputToken, setInputToken] = useState('');
+  const [currentTokenCode, setCurrentTokenCode] = useState('');
 
-const UTBKAdminApp = () => {
-  const [screen, setScreen] = useState('admin_login'); 
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [viewMode, setViewMode] = useState('tokens');
-  
-  const [tokenList, setTokenList] = useState([]);
+  // Test State
+  const [currentSubtestIndex, setCurrentSubtestIndex] = useState(0);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [doubtful, setDoubtful] = useState({});
+  const [testOrder, setTestOrder] = useState([]);
+  const [questionOrder, setQuestionOrder] = useState({});
+  const [breakTime, setBreakTime] = useState(10); 
+  const [countdownTime, setCountdownTime] = useState(10);
   const [bankSoal, setBankSoal] = useState({});
-  const [filterStatus, setFilterStatus] = useState('all');
   
-  const [newTokenName, setNewTokenName] = useState('');
-  const [newTokenPhone, setNewTokenPhone] = useState('');
-  
-  // MODE: 'fonnte' | 'js_app' | 'manual_web'
-  const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
+  // GLOBAL TIME TRACKING
+  const [globalStartTime, setGlobalStartTime] = useState(null);
 
-  const [selectedSubtest, setSelectedSubtest] = useState('pu');
-  const [questionText, setQuestionText] = useState('');
-  const [questionImage, setQuestionImage] = useState('');
-  const [options, setOptions] = useState(['', '', '', '', '']);
-  const [correctAnswer, setCorrectAnswer] = useState('A');
-  const [editingId, setEditingId] = useState(null);
-  const [isSending, setIsSending] = useState(false); 
+  // Leaderboard & Security
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [myRank, setMyRank] = useState(null);
+  const [violationReason, setViolationReason] = useState(null);
 
+  // --- SECURITY SYSTEM ---
+  useEffect(() => {
+    const handleContextMenu = (e) => e.preventDefault();
+    const handleKeyDown = (e) => {
+      if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || e.key === 'PrintScreen') {
+        e.preventDefault();
+        alert('⚠️ DILARANG: Screenshot atau Developer Tools!');
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.hidden && screen === 'test') {
+        setViolationReason("TERDETEKSI KELUAR APLIKASI / PINDAH TAB");
+        setScreen('result');
+      }
+    };
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [screen]);
+
+  // Load Bank Soal
   useEffect(() => {
     const loadBankSoal = async () => {
       const loaded = {};
@@ -59,345 +81,215 @@ const UTBKAdminApp = () => {
     loadBankSoal();
   }, []);
 
-  const handleLogin = async (e) => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, adminEmail, adminPassword); setScreen('dashboard'); loadTokens(); } catch (error) { alert('Login Gagal.'); } };
-  const handleLogout = async () => { await signOut(auth); setScreen('admin_login'); };
+  // --- LOGIC RESULT & GLOBAL SCORING ---
+  useEffect(() => {
+    if (screen === 'result' && currentTokenCode) {
+        const finishExamProcess = async () => {
+            const { totalScore } = calculateScore();
+            
+            // Hitung Global Time Left
+            const totalAllocatedMinutes = SUBTESTS.reduce((acc, curr) => acc + curr.time, 0);
+            const totalAllocatedMS = totalAllocatedMinutes * 60 * 1000;
+            const usedTimeMS = globalStartTime ? (Date.now() - globalStartTime) : totalAllocatedMS;
+            const globalTimeLeftSeconds = Math.max(0, Math.floor((totalAllocatedMS - usedTimeMS) / 1000));
 
-  // --- FITUR BARU: RESET LEADERBOARD (HAPUS SKOR SAJA) ---
-  const resetLeaderboard = async () => {
-    if (!confirm("⚠️ PERINGATAN: Ini akan MENGHAPUS SEMUA SKOR siswa!\n\nToken tidak akan terhapus, tapi siswa akan hilang dari Leaderboard.\nApakah Anda yakin?")) return;
-    
-    try {
-        const querySnapshot = await getDocs(collection(db, 'tokens'));
-        const updates = [];
-        
-        querySnapshot.forEach((docSnap) => {
-             // Hapus field score, finalTimeLeft, dan finishedAt
-             if (docSnap.data().score !== undefined) {
-                 updates.push(updateDoc(docSnap.ref, {
-                     score: deleteField(),
-                     finalTimeLeft: deleteField(),
-                     finishedAt: deleteField()
-                 }));
-             }
-        });
-        
-        await Promise.all(updates);
-        alert("✅ Leaderboard berhasil di-reset!");
-        loadTokens();
-    } catch (error) {
-        console.error(error);
-        alert("Gagal reset leaderboard.");
+            try {
+                // Update Data
+                const tokenRef = doc(db, 'tokens', currentTokenCode);
+                await updateDoc(tokenRef, { 
+                    score: totalScore,
+                    finalTimeLeft: globalTimeLeftSeconds,
+                    finishedAt: new Date().toISOString()
+                });
+
+                // Ambil Leaderboard
+                const q = query(
+                    collection(db, 'tokens'),
+                    where('score', '!=', null),
+                    orderBy('score', 'desc'),
+                    orderBy('finalTimeLeft', 'desc'),
+                    limit(10)
+                );
+
+                const querySnapshot = await getDocs(q);
+                const top10 = [];
+                let rank = 1;
+                let userRank = null;
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    top10.push({
+                        rank: rank,
+                        name: data.studentName,
+                        score: data.score,
+                        timeLeft: data.finalTimeLeft 
+                    });
+                    if (data.tokenCode === currentTokenCode) userRank = rank;
+                    rank++;
+                });
+
+                setLeaderboard(top10);
+                setMyRank(userRank);
+            } catch (error) { console.error("Leaderboard Error:", error); }
+        };
+        finishExamProcess();
     }
-  };
+  }, [screen]); 
 
-  // --- FUNGSI UPDATE STATUS PENGIRIMAN KE DB ---
-  const markAsSent = async (tokenCode, method) => {
+  const handleTokenLogin = async () => {
+    if (!inputToken.trim()) { alert('Masukkan Kode Token!'); return; }
+    const tokenCode = inputToken.trim().toUpperCase();
+    const docRef = doc(db, 'tokens', tokenCode);
     try {
-        const tokenRef = doc(db, 'tokens', tokenCode);
-        await updateDoc(tokenRef, {
-            isSent: true,
-            sentMethod: method, 
-            sentAt: new Date().toISOString()
-        });
-        loadTokens(); 
-    } catch (error) {
-        console.error("Gagal update status sent:", error);
-    }
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) { alert('Token TIDAK DITEMUKAN.'); return; }
+      const data = docSnap.data();
+      if ((Date.now() - new Date(data.createdAt).getTime()) > 24 * 60 * 60 * 1000) { alert('Token EXPIRED.'); return; }
+      if (data.status === 'used') { alert(`Halo ${data.studentName}, token SUDAH TERPAKAI.`); return; }
+      if (confirm(`Login sebagai ${data.studentName}?`)) {
+        await updateDoc(docRef, { status: 'used', loginAt: new Date().toISOString() });
+        setStudentName(data.studentName);
+        setCurrentTokenCode(tokenCode);
+        setViolationReason(null);
+        try { await document.documentElement.requestFullscreen(); } catch (err) { console.log("Fullscreen blocked"); }
+        setCountdownTime(10); 
+        setScreen('countdown'); 
+      }
+    } catch (error) { console.error(error); alert('Koneksi Error.'); }
   };
 
-  // 1. ENGINE UTAMA (FONNTE - API)
-  const sendFonnteMessage = async (name, phone, token) => {
-    if (!FONNTE_TOKEN) { alert("Token Fonnte Kosong!"); return; }
-    setIsSending(true);
+  const startTest = (bypass = false) => {
+    if (!bypass) return;
+    if (!globalStartTime) setGlobalStartTime(Date.now()); // Set Global Timer
 
-    let formattedPhone = phone.toString().replace(/\D/g, '');
-    if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
-
-    try {
-        const params = new URLSearchParams({
-            token: FONNTE_TOKEN,
-            target: formattedPhone,
-            message: message,
-            delay: SEND_DELAY,
-            countryCode: '62'
-        });
-        await fetch(`https://api.fonnte.com/send?${params.toString()}`, { method: 'GET', mode: 'no-cors' });
-        await markAsSent(token, 'Fonnte (Auto)');
-        alert(`✅ (FONNTE) Pesan dikirim ke ${name}`);
-    } catch (error) {
-        console.error(error); alert("❌ Gagal Kirim Fonnte.");
-    } finally {
-        setIsSending(false);
-    }
+    for (const s of SUBTESTS) { if ((bankSoal[s.id]?.length || 0) < s.questions) { alert(`Soal ${s.name} belum siap.`); return; } }
+    const shuffled = [...SUBTESTS].sort(() => Math.random() - 0.5);
+    setTestOrder(shuffled);
+    const qOrder = {};
+    shuffled.forEach((subtest) => {
+      const bank = [...(bankSoal[subtest.id] || [])];
+      qOrder[subtest.id] = bank.sort(() => Math.random() - 0.5).slice(0, subtest.questions);
+    });
+    setQuestionOrder(qOrder);
+    setCurrentSubtestIndex(0); setCurrentQuestion(0); setTimeLeft(shuffled[0].time * 60);
+    setAnswers({}); setDoubtful({}); setScreen('test');
   };
 
-  // 2. ENGINE JS DIRECT (WHATSAPP PROTOCOL)
-  const sendJsDirect = async (name, phone, token) => {
-    let formattedPhone = phone.toString().replace(/\D/g, '');
-    if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
-
-    window.location.href = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
-    await markAsSent(token, 'JS App (Direct)');
-  };
-
-  // 3. ENGINE MANUAL (WA WEB)
-  const sendManualWeb = async (name, phone, token) => {
-    let formattedPhone = phone.toString().replace(/\D/g, '');
-    if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
-    
-    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
-    await markAsSent(token, 'WA Web (Manual)');
-  };
-
-  const createToken = async () => {
-    if (!newTokenName || !newTokenPhone) { alert('Isi Nama & HP!'); return; }
-    const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    
-    try { 
-        await setDoc(doc(db, 'tokens', tokenCode), { 
-            tokenCode, 
-            studentName: newTokenName, 
-            studentPhone: newTokenPhone, 
-            status: 'active', 
-            createdAt: new Date().toISOString(),
-            isSent: false, 
-            sentMethod: '-' 
-        });
-        
-        let modeLabel = "";
-        if (autoSendMode === 'fonnte') modeLabel = "AUTOMATIC (Fonnte)";
-        else if (autoSendMode === 'js_app') modeLabel = "JS DIRECT (App)";
-        else modeLabel = "MANUAL (Web)";
-        
-        if(confirm(`Token Berhasil: ${tokenCode}\n\nKirim via Jalur ${modeLabel}?`)) {
-            if (autoSendMode === 'fonnte') await sendFonnteMessage(newTokenName, newTokenPhone, tokenCode);
-            else if (autoSendMode === 'js_app') await sendJsDirect(newTokenName, newTokenPhone, tokenCode);
-            else await sendManualWeb(newTokenName, newTokenPhone, tokenCode);
-        } else {
-            loadTokens();
-        }
-        
-        setNewTokenName(''); setNewTokenPhone(''); 
-    } catch (error) { alert('Gagal generate token.'); }
-  };
-
-  const loadTokens = async () => { const s = await getDocs(collection(db, 'tokens')); const t = []; s.forEach((d) => t.push(d.data())); t.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); setTokenList(t); };
-  const deleteToken = async (code) => { if(confirm('Hapus token ini?')) { await deleteDoc(doc(db, 'tokens', code)); loadTokens(); }};
-  const deleteAllTokens = async () => { if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; try { await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); alert("Semua terhapus."); loadTokens(); } catch (error) { alert("Gagal."); } };
-
-  // --- LOGIC STATISTIK & FILTER (TETAP ADA) ---
-  const isExpired = (createdAt) => (Date.now() - new Date(createdAt).getTime()) > 24 * 60 * 60 * 1000;
-  const activeTokens = tokenList.filter(t => t.status === 'active' && !isExpired(t.createdAt));
-  const usedTokens = tokenList.filter(t => t.status === 'used');
-  const expiredTokens = tokenList.filter(t => isExpired(t.createdAt));
+  useEffect(() => { if (screen === 'countdown' && countdownTime > 0) { const t = setTimeout(() => setCountdownTime(countdownTime - 1), 1000); return () => clearTimeout(t); } else if (screen === 'countdown' && countdownTime === 0) { startTest(true); } }, [countdownTime, screen]);
+  useEffect(() => { if (screen === 'test' && timeLeft > 0) { const t = setTimeout(() => setTimeLeft(timeLeft - 1), 1000); return () => clearTimeout(t); } else if (screen === 'test' && timeLeft === 0) { if (currentSubtestIndex < testOrder.length - 1) { setScreen('break'); setBreakTime(10); } else setScreen('result'); } }, [timeLeft, screen]);
+  useEffect(() => { if (screen === 'break' && breakTime > 0) { const t = setTimeout(() => setBreakTime(breakTime - 1), 1000); return () => clearTimeout(t); } else if (screen === 'break' && breakTime === 0) { const n = currentSubtestIndex + 1; setCurrentSubtestIndex(n); setCurrentQuestion(0); setTimeLeft(testOrder[n].time * 60); setScreen('test'); } }, [breakTime, screen]);
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [currentQuestion, currentSubtestIndex, screen]);
+  const handleAnswer = (val) => { const k = `${testOrder[currentSubtestIndex].id}_${currentQuestion}`; setAnswers(p => ({ ...p, [k]: val })); };
+  const calculateScore = () => { const sc = {}; let tot = 0; testOrder.forEach(s => { let sub = 0; questionOrder[s.id].forEach((q, i) => { const k = `${s.id}_${i}`; if (!answers[k]) sub -= 1; else if (answers[k] === q.correct) sub += 4; }); sc[s.id] = sub; tot += sub; }); return { scores: sc, totalScore: tot }; };
+  const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2,'0')}:${(s % 60).toString().padStart(2,'0')}`;
   
-  const getFilteredList = () => { 
-      switch (filterStatus) { 
-          case 'active': return activeTokens; 
-          case 'used': return usedTokens; 
-          case 'expired': return expiredTokens; 
-          default: return tokenList; 
-      } 
-  };
-  // -----------------------------------------------------
+  const FooterLiezira = () => (
+    <div className="mt-8 py-4 border-t border-gray-200 w-full text-center">
+      <p className="text-gray-400 text-xs font-mono flex items-center justify-center gap-1">
+        <Copyright size={12} /> {new Date().getFullYear()} Created by <span className="font-bold text-indigo-400">Liezira</span>
+      </p>
+    </div>
+  );
 
-  const saveSoal = async (sid, q) => { await setDoc(doc(db, 'bank_soal', sid), { questions: q }); setBankSoal(p => ({ ...p, [sid]: q })); };
-  const addOrUpdate = async () => {
-    if (!questionText.trim() || options.some(o => !o.trim())) { alert('Lengkapi!'); return; }
-    const q = { id: editingId || Date.now().toString(), question: questionText, image: questionImage, options, correct: correctAnswer };
-    const cur = bankSoal[selectedSubtest] || [];
-    const upd = editingId ? cur.map(x => x.id === editingId ? q : x) : [...cur, q];
-    await saveSoal(selectedSubtest, upd); alert('Disimpan!'); resetForm();
-  };
-  const deleteSoal = async (id) => { if(confirm('Hapus?')) await saveSoal(selectedSubtest, (bankSoal[selectedSubtest]||[]).filter(x => x.id !== id)); };
-  const resetForm = () => { setQuestionText(''); setQuestionImage(''); setOptions(['','','','','']); setCorrectAnswer('A'); setEditingId(null); };
-  const generateDummy = async () => { if (!confirm('Isi Dummy?')) return; const n = { ...bankSoal }; for (const s of SUBTESTS) { const cur = bankSoal[s.id] || []; const need = s.questions - cur.length; if (need > 0) { const d = []; for (let i = 0; i < need; i++) d.push({ id: `d_${s.id}_${i}`, question: `Dummy ${s.name} ${i+1}`, image: '', options: ['A','B','C','D','E'], correct: 'A' }); const fin = [...cur, ...d]; await setDoc(doc(db, 'bank_soal', s.id), { questions: fin }); n[s.id] = fin; } } setBankSoal(n); alert('Dummy Done!'); };
+  // --- UI SCREENS ---
 
-  if (screen === 'admin_login') {
+  if (screen === 'countdown') {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
-          <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Admin Portal</h2>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full p-3 border rounded" placeholder="Email" required />
-            <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full p-3 border rounded" placeholder="Password" required />
-            <button className="w-full bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700">Masuk</button>
-          </form>
-          <div className="mt-8 text-center text-xs text-gray-400 font-mono">© {new Date().getFullYear()} Liezira</div>
+      <div className="min-h-screen bg-indigo-900 flex flex-col items-center justify-center text-white select-none">
+        <div className="mb-8 animate-pulse"><Timer size={64} /></div>
+        <h2 className="text-2xl font-bold mb-4 uppercase tracking-widest">Persiapan Ujian</h2>
+        <div className="text-[120px] font-bold leading-none mb-4 text-yellow-400 font-mono">{countdownTime}</div>
+        <p className="text-indigo-200 text-sm max-w-md text-center px-4">Pastikan posisi nyaman. Dilarang keluar fullscreen.</p>
+      </div>
+    );
+  }
+
+  if (screen === 'landing') {
+    return (
+      <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full relative text-center my-8">
+          <div className="absolute top-0 left-0 w-full h-2 bg-indigo-600"></div>
+          <h1 className="text-2xl font-bold text-indigo-900 mb-1">Sistem Test UTBK SNBT</h1>
+          <p className="text-gray-500 mb-6 text-sm">Platform Ujian Berbasis Token Aman</p>
+
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-left text-xs text-red-800">
+            <div className="font-bold flex items-center gap-2 mb-2 text-red-900"><ShieldAlert size={16}/> STRICT MODE:</div>
+            <ul className="list-disc pl-4 space-y-1 font-semibold"><li>DILARANG PINDAH TAB.</li><li>DILARANG MINIMIZE.</li><li>Pelanggaran = <span className="underline">DISKUALIFIKASI</span>.</li></ul>
+          </div>
+
+          <div className="bg-indigo-50 border border-indigo-200 p-5 rounded-xl mb-6">
+            <label className="block text-indigo-900 font-bold mb-2 text-sm flex items-center justify-center gap-2"><Ticket size={18}/> Kode Token:</label>
+            <input type="text" value={inputToken} onChange={e => setInputToken(e.target.value.toUpperCase())} className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg text-xl font-mono text-center tracking-widest uppercase outline-none focus:ring-4 focus:ring-indigo-100 bg-white" placeholder="UTBK-XXXXXX" />
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6 text-left shadow-sm">
+            <h3 className="font-bold text-gray-800 text-sm mb-3 flex items-center gap-2"><AlertCircle size={16} className="text-indigo-600"/> Poin Penilaian:</h3>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex justify-between bg-green-50 px-2 py-1 rounded border border-green-100"><span className="flex gap-2 items-center"><CheckCircle size={16} className="text-green-600"/>Benar</span><span className="font-bold text-green-700">+4</span></li>
+              <li className="flex justify-between bg-red-50 px-2 py-1 rounded border border-red-100"><span className="flex gap-2 items-center"><XCircle size={16} className="text-red-500"/>Salah</span><span className="font-bold text-red-700">0</span></li>
+              <li className="flex justify-between bg-orange-50 px-2 py-1 rounded border border-orange-100"><span className="flex gap-2 items-center"><AlertCircle size={16} className="text-orange-500"/>Kosong</span><span className="font-bold text-orange-700">-1</span></li>
+            </ul>
+          </div>
+
+          <button onClick={handleTokenLogin} className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold text-base hover:bg-indigo-700 transition shadow-lg transform hover:-translate-y-1">Mulai Ujian Sekarang</button>
+          <FooterLiezira />
         </div>
       </div>
     );
   }
 
+  if (screen === 'break') {
+    return (
+      <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 to-white flex flex-col items-center justify-center p-4 select-none">
+        <div className="relative flex items-center justify-center mb-8">
+          <div className="absolute w-64 h-64 rounded-full border-4 border-indigo-100"></div>
+          <div className="absolute w-60 h-60 rounded-full border-8 border-indigo-500 animate-pulse opacity-20"></div>
+          <div className="w-56 h-56 bg-white rounded-full shadow-2xl flex items-center justify-center border-8 border-indigo-600 relative z-10">
+            <div className="text-center"><span className="block text-7xl font-bold text-indigo-700">{breakTime}</span><span className="text-indigo-400 text-sm font-bold uppercase tracking-wider">Detik</span></div>
+          </div>
+        </div>
+        <p className="text-sm text-gray-400 font-medium tracking-wide">LANJUT OTOMATIS...</p>
+      </div>
+    );
+  }
+
+  const currentSubtest = testOrder[currentSubtestIndex];
+  if (!currentSubtest || !questionOrder[currentSubtest.id]) return <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div><p>Memuat soal...</p></div>;
+  const currentQ = questionOrder[currentSubtest.id][currentQuestion];
+  const key = `${currentSubtest.id}_${currentQuestion}`;
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="sticky top-0 z-40 bg-white shadow px-6 py-4 flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold text-indigo-900">Admin Panel</h1>
-        <div className="flex gap-2">
-          <button onClick={() => setViewMode('tokens')} className={`px-4 py-2 rounded ${viewMode==='tokens'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Token</button>
-          <button onClick={() => setViewMode('soal')} className={`px-4 py-2 rounded ${viewMode==='soal'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Bank Soal</button>
-          <button onClick={handleLogout} className="text-red-600 px-3"><LogOut size={18}/></button>
+    <div className="min-h-screen w-full bg-gray-50 select-none pb-10">
+      <div className="sticky top-0 z-40 bg-indigo-700 text-white p-4 shadow-lg"><div className="max-w-6xl mx-auto flex justify-between items-center"><div><h2 className="text-xl font-bold">{currentSubtest.name}</h2><p className="text-sm text-indigo-200">Soal {currentQuestion + 1} / {currentSubtest.questions}</p></div><div className="flex items-center gap-3 bg-indigo-800 px-6 py-3 rounded-lg"><Clock size={24} /><span className="text-2xl font-bold">{formatTime(timeLeft)}</span></div></div></div>
+      <div className="max-w-6xl mx-auto p-6"><div className="grid grid-cols-1 lg:grid-cols-4 gap-6"><div className="lg:col-span-1"><div className="bg-white rounded-lg shadow p-4 sticky top-24"><h3 className="font-semibold text-gray-700 mb-3">Navigasi</h3><div className="grid grid-cols-5 gap-2">{Array.from({ length: currentSubtest.questions }).map((_, idx) => { const qKey = `${currentSubtest.id}_${idx}`; return (<button key={idx} onClick={() => setCurrentQuestion(idx)} className={`w-10 h-10 rounded font-semibold ${idx === currentQuestion ? 'bg-indigo-600 text-white' : answers[qKey] ? (doubtful[qKey]?'bg-yellow-400 text-white':'bg-green-500 text-white') : 'bg-gray-200'}`}>{idx + 1}</button>); })}</div></div></div>
+      
+      {/* BAGIAN UTAMA SOAL */}
+      <div className="lg:col-span-3">
+        <div className="bg-white rounded-lg shadow-lg p-6 min-h-[500px]">
+          {/* TEKS SOAL */}
+          <div className="mb-6">
+            <p className="text-lg font-medium text-gray-800 mb-4 leading-relaxed">{currentQ?.question}</p>
+            
+            {/* GAMBAR SOAL DENGAN STYLING FIX */}
+            {currentQ?.image && (
+                <img 
+                    src={currentQ.image} 
+                    alt="Soal" 
+                    className="max-w-full h-auto max-h-[500px] object-contain mx-auto rounded-lg shadow-md mb-6 border border-gray-100" 
+                    onContextMenu={e=>e.preventDefault()} 
+                />
+            )}
+          </div>
+
+          <div className="space-y-3 mb-6">{['A', 'B', 'C', 'D', 'E'].map((l, idx) => (<button key={l} onClick={() => handleAnswer(l)} className={`w-full text-left p-4 rounded-lg border-2 flex items-center gap-3 ${answers[key]===l?'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600':'border-gray-200 hover:bg-gray-50'}`}><span className={`w-8 h-8 flex items-center justify-center font-bold rounded ${answers[key]===l?'bg-indigo-600 text-white':'bg-indigo-100 text-indigo-700'}`}>{l}</span><span className="flex-1">{currentQ?.options[idx]}</span></button>))}</div>
+          <div className="flex items-center gap-3 mb-6"><input type="checkbox" id="doubt" checked={doubtful[key]||false} onChange={()=>setDoubtful(p=>({...p,[key]:!p[key]}))} className="w-5 h-5" /><label htmlFor="doubt">Ragu-ragu</label></div>
+          <div className="flex gap-3"><button onClick={() => setCurrentQuestion(currentQuestion - 1)} disabled={currentQuestion === 0} className="px-6 py-3 bg-gray-500 text-white rounded-lg font-semibold disabled:bg-gray-300">Kembali</button><button onClick={() => { if (currentQuestion < currentSubtest.questions - 1) setCurrentQuestion(currentQuestion + 1); else if (confirm('Lanjut subtest?')) { if (currentSubtestIndex < testOrder.length - 1) { setScreen('break'); setBreakTime(10); } else setScreen('result'); } }} className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">Selanjutnya</button></div>
         </div>
       </div>
-
-      <div className="max-w-6xl mx-auto p-4 flex-1 w-full">
-        {viewMode === 'tokens' ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow h-fit">
-              <h2 className="font-bold mb-4 flex items-center gap-2"><Plus size={18}/> Buat Token</h2>
-              
-              {/* --- 3 JALUR SENDING CONFIG --- */}
-              <div className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <p className="text-xs font-bold text-gray-500 mb-2 uppercase flex items-center gap-1"><Settings size={12}/> Metode Kirim Default:</p>
-                <div className="flex flex-col gap-2">
-                    <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'fonnte' ? 'bg-green-100 border-green-400 text-green-700 ring-1 ring-green-400' : 'bg-white border-gray-300 text-gray-500'}`}>
-                        <input type="radio" name="sendMode" value="fonnte" checked={autoSendMode === 'fonnte'} onChange={() => setAutoSendMode('fonnte')} className="hidden" />
-                        <Zap size={14} className={autoSendMode==='fonnte' ? "fill-green-600" : ""}/> 1. Auto (Fonnte API)
-                    </label>
-                    
-                    <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'manual_web' ? 'bg-blue-100 border-blue-400 text-blue-700 ring-1 ring-blue-400' : 'bg-white border-gray-300 text-gray-500'}`}>
-                        <input type="radio" name="sendMode" value="manual_web" checked={autoSendMode === 'manual_web'} onChange={() => setAutoSendMode('manual_web')} className="hidden" />
-                        <ExternalLink size={14}/> 2. Manual (WA Web)
-                    </label>
-
-                    <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'js_app' ? 'bg-purple-100 border-purple-400 text-purple-700 ring-1 ring-purple-400' : 'bg-white border-gray-300 text-gray-500'}`}>
-                        <input type="radio" name="sendMode" value="js_app" checked={autoSendMode === 'js_app'} onChange={() => setAutoSendMode('js_app')} className="hidden" />
-                        <Smartphone size={14}/> 3. JS Direct (App)
-                    </label>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-2 border rounded" placeholder="Nama Siswa"/>
-                <input value={newTokenPhone} onChange={e=>setNewTokenPhone(e.target.value)} className="w-full p-2 border rounded" placeholder="No WhatsApp (08xxx)"/>
-                
-                <button onClick={createToken} disabled={isSending} className={`w-full py-2 rounded transition text-white font-bold flex items-center justify-center gap-2 ${isSending ? 'bg-gray-400' : autoSendMode === 'fonnte' ? 'bg-green-600 hover:bg-green-700' : autoSendMode === 'js_app' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                    {isSending ? 'Mengirim...' : 'Generate & Kirim'}
-                </button>
-              </div>
-            </div>
-
-            <div className="md:col-span-2 space-y-4">
-              
-              {/* --- STATISTIK DASHBOARD --- */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <button onClick={() => setFilterStatus('all')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                  <p className="text-xs text-gray-500 uppercase font-bold">Total</p>
-                  <p className="text-2xl font-bold text-gray-800">{tokenList.length}</p>
-                </button>
-
-                <button onClick={() => setFilterStatus('active')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'active' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                  <p className="text-xs text-green-600 uppercase font-bold">Aktif</p>
-                  <p className="text-2xl font-bold text-green-700">{activeTokens.length}</p>
-                </button>
-
-                <button onClick={() => setFilterStatus('used')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'used' ? 'bg-gray-100 border-gray-500 ring-2 ring-gray-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                  <p className="text-xs text-gray-600 uppercase font-bold">Terpakai</p>
-                  <p className="text-2xl font-bold text-gray-700">{usedTokens.length}</p>
-                </button>
-
-                <button onClick={() => setFilterStatus('expired')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'expired' ? 'bg-red-50 border-red-500 ring-2 ring-red-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                  <p className="text-xs text-red-600 uppercase font-bold">Expired</p>
-                  <p className="text-2xl font-bold text-red-700">{expiredTokens.length}</p>
-                </button>
-              </div>
-              {/* ----------------------------------------------- */}
-
-              <div className="bg-white p-6 rounded-xl shadow">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="font-bold text-lg">List Token</h2>
-                    <div className="flex gap-2">
-                         {/* TOMBOL RESET LEADERBOARD (BARU) */}
-                         <button onClick={resetLeaderboard} className="text-orange-600 text-sm font-bold flex items-center gap-1 border border-orange-200 bg-orange-50 px-2 py-1 rounded hover:bg-orange-100">
-                           <RefreshCw size={14}/> Reset Scores
-                        </button>
-                        <button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>
-                        {tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}
-                    </div>
-                </div>
-                <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 sticky top-0">
-                        <tr>
-                            <th className="p-2">Kode</th>
-                            <th className="p-2">Nama</th>
-                            <th className="p-2">Status</th>
-                            <th className="p-2">Kirim</th>
-                            <th className="p-2 text-center">Opsi</th>
-                            <th className="p-2 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>{getFilteredList().map(t=>(<tr key={t.tokenCode} className="border-b">
-                        <td className="p-2 font-mono text-indigo-600 font-bold">{t.tokenCode}</td>
-                        <td className="p-2">{t.studentName}<div className="text-xs text-gray-400">{t.studentPhone}</div></td>
-                        <td className="p-2">{isExpired(t.createdAt)?<span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">EXPIRED</span>:<span className={`px-2 py-1 rounded text-xs font-bold ${t.status==='active'?'bg-green-100 text-green-700':'bg-gray-200'}`}>{t.status.toUpperCase()}</span>}</td>
-                        
-                        {/* STATUS TRACKER */}
-                        <td className="p-2">
-                            {t.isSent ? (
-                                <div className="flex flex-col">
-                                    <span className="flex items-center gap-1 text-green-600 font-bold text-xs"><CheckCircle2 size={12}/> Terkirim</span>
-                                    <span className="text-[10px] text-gray-400">{t.sentMethod}</span>
-                                </div>
-                            ) : (
-                                <span className="flex items-center gap-1 text-gray-400 text-xs"><XCircle size={12}/> Belum</span>
-                            )}
-                        </td>
-                    
-                        {/* 3 JALUR TOMBOL */}
-                        <td className="p-2 flex gap-2 justify-center">
-                            <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} 
-                                className="bg-green-50 text-green-700 p-1.5 rounded border border-green-200 hover:bg-green-100" title="Auto (Fonnte)">
-                                <Zap size={16}/>
-                            </button>
-                            <button onClick={() => sendManualWeb(t.studentName, t.studentPhone, t.tokenCode)} 
-                                className="bg-blue-50 text-blue-700 p-1.5 rounded border border-blue-200 hover:bg-blue-100" title="Manual (Web)">
-                                <ExternalLink size={16}/>
-                            </button>
-                            <button onClick={() => sendJsDirect(t.studentName, t.studentPhone, t.tokenCode)} 
-                                className="bg-purple-50 text-purple-700 p-1.5 rounded border border-purple-200 hover:bg-purple-100" title="Direct (App)">
-                                <Smartphone size={16}/>
-                            </button>
-                        </td>
-
-                        <td className="p-2 text-center">
-                            <button onClick={()=>deleteToken(t.tokenCode)} className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded border border-red-200"><Trash2 size={16}/></button>
-                        </td>
-                    
-                    </tr>))}</tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white p-6 rounded-lg shadow">
-             <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold">Editor Soal</h2><button onClick={generateDummy} className="text-sm bg-green-100 text-green-700 px-4 py-2 rounded hover:bg-green-200">+ Auto Fill</button></div>
-             <div className="bg-gray-50 p-6 rounded-xl border mb-8">
-               <select value={selectedSubtest} onChange={e => { setSelectedSubtest(e.target.value); resetForm(); }} className="w-full p-3 border rounded mb-4 bg-white font-medium">{SUBTESTS.map(s => <option key={s.id} value={s.id}>{s.name} ({bankSoal[s.id]?.length || 0} / {s.questions})</option>)}</select>
-               <textarea value={questionText} onChange={e => setQuestionText(e.target.value)} className="w-full p-3 border rounded mb-4" rows="3" placeholder="Pertanyaan..." /><input value={questionImage} onChange={e => setQuestionImage(e.target.value)} className="w-full p-3 border rounded mb-4" placeholder="URL Gambar" />
-               <div className="space-y-2 mb-4">{options.map((o, i) => (<div key={i} className="flex gap-2 items-center"><span className="w-8 h-8 flex items-center justify-center bg-indigo-100 font-bold rounded">{['A','B','C','D','E'][i]}</span><input value={o} onChange={e => {const n=[...options];n[i]=e.target.value;setOptions(n)}} className="w-full p-2 border rounded" /></div>))}</div>
-               <div className="flex gap-2 mb-4">{['A','B','C','D','E'].map(l => (<button key={l} onClick={() => setCorrectAnswer(l)} className={`flex-1 py-2 border rounded font-bold ${correctAnswer===l?'bg-green-600 text-white':'bg-white'}`}>{l}</button>))}</div>
-               <div className="flex gap-2"><button onClick={addOrUpdate} className="flex-1 bg-indigo-600 text-white py-3 rounded font-bold">{editingId ? 'Simpan' : 'Tambah'}</button>{editingId && <button onClick={resetForm} className="px-6 border py-3 rounded">Batal</button>}</div>
-             </div>
-             <div className="space-y-2 max-h-[500px] overflow-y-auto">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded flex justify-between items-start"><div className="flex-1 pr-4"><span className="font-bold text-indigo-600 mr-2">#{i+1}</span> {q.question}</div><div className="flex gap-2"><button onClick={() => { setQuestionText(q.question); setQuestionImage(q.image||''); setOptions([...q.options]); setCorrectAnswer(q.correct); setEditingId(q.id); window.scrollTo({top:0, behavior:'smooth'}); }} className="text-indigo-600"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="text-red-600"><Trash2 size={18}/></button></div></div>))}</div>
-          </div>
-        )}
-      </div>
       
-      <div className="py-6 bg-white border-t border-gray-200 w-full text-center">
-        <p className="text-gray-400 text-xs font-mono flex items-center justify-center gap-1">
-          <Copyright size={12} /> {new Date().getFullYear()} Created by <span className="font-bold text-indigo-500">Liezira</span>
-        </p>
-      </div>
+      </div></div>
     </div>
   );
 };
 
-export default UTBKAdminApp;
+export default UTBKStudentApp;
