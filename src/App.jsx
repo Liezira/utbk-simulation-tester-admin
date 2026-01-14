@@ -41,6 +41,7 @@ const UTBKAdminApp = () => {
   const [newTokenName, setNewTokenName] = useState('');
   const [newTokenPhone, setNewTokenPhone] = useState('');
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
+  const [isSending, setIsSending] = useState(false);
 
   // --- STATE EDITOR SOAL ---
   const [selectedSubtest, setSelectedSubtest] = useState('pu');
@@ -56,7 +57,6 @@ const UTBKAdminApp = () => {
   const [correctAnswer, setCorrectAnswer] = useState('A'); 
   
   const [editingId, setEditingId] = useState(null);
-  const [isSending, setIsSending] = useState(false); 
 
   // --- INITIAL LOAD ---
   useEffect(() => {
@@ -268,7 +268,7 @@ const UTBKAdminApp = () => {
   };
 
   // ==========================================
-  // --- LOGIC BANK SOAL (VERSI LENGKAP) ---
+  // --- LOGIC BANK SOAL (VERSI LENGKAP DENGAN 3 TIPE) ---
   // ==========================================
 
   const saveSoal = async (subtestId, questionsData) => { 
@@ -449,7 +449,7 @@ const UTBKAdminApp = () => {
 
       <div className="max-w-7xl mx-auto p-4 flex-1 w-full">
         {viewMode === 'tokens' ? (
-          /* --- UI TOKEN MANAGER (TAMPILAN BARU) --- */
+          /* --- UI TOKEN MANAGER (TAMPILAN BARU GRID CLEAN) --- */
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
              {/* PANEL KIRI: BUAT TOKEN */}
              <div className="md:col-span-1">
@@ -575,7 +575,7 @@ const UTBKAdminApp = () => {
              </div>
           </div>
         ) : (
-          /* --- UI EDITOR SOAL (VERSI LENGKAP DENGAN TOGGLE) --- */
+          /* --- UI EDITOR SOAL (VERSI LENGKAP DENGAN 3 TIPE) --- */
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
              <div className="flex justify-between items-center mb-6">
                  <h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2>
@@ -597,7 +597,7 @@ const UTBKAdminApp = () => {
                    ))}
                </select>
                
-               {/* TOGGLE TIPE SOAL (FITUR UTAMA) */}
+               {/* TOGGLE 3 TIPE SOAL */}
                <div className="mb-6">
                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Format Soal:</label>
                  <div className="flex flex-wrap gap-2">
