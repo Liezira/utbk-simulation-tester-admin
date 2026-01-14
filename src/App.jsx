@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle, RefreshCw, List, CheckSquare, Type } from 'lucide-react';
+import { 
+  Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, 
+  MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
+  CheckCircle2, XCircle, RefreshCw, List, CheckSquare, Type 
+} from 'lucide-react';
 import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, deleteField } from 'firebase/firestore'; 
+import { 
+  doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, deleteField 
+} from 'firebase/firestore'; 
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
-// Konfigurasi Subtest (Sesuai UTBK Asli)
+// --- KONFIGURASI ---
 const SUBTESTS = [
   { id: 'pu', name: 'Penalaran Umum', questions: 30 },
   { id: 'ppu', name: 'Pengetahuan & Pemahaman Umum', questions: 20 },
@@ -15,7 +21,6 @@ const SUBTESTS = [
   { id: 'pm', name: 'Penalaran Matematika', questions: 20 },
 ];
 
-// Konfigurasi Link & Token Fonnte (Opsional)
 const STUDENT_APP_URL = "https://utbk-simulation-tester-student.vercel.app"; 
 const FONNTE_TOKEN = import.meta.env.VITE_FONNTE_TOKEN; 
 const SEND_DELAY = 3; 
@@ -25,27 +30,35 @@ const UTBKAdminApp = () => {
   const [screen, setScreen] = useState('admin_login'); 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-  const [viewMode, setViewMode] = useState('tokens'); // 'tokens' or 'soal'
+  const [viewMode, setViewMode] = useState('tokens'); 
   
   // Data State
   const [tokenList, setTokenList] = useState([]);
   const [bankSoal, setBankSoal] = useState({});
   const [filterStatus, setFilterStatus] = useState('all');
+  
+  // Create Token State
   const [newTokenName, setNewTokenName] = useState('');
   const [newTokenPhone, setNewTokenPhone] = useState('');
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
 
-  // --- STATE EDITOR SOAL (BARU) ---
+  // --- STATE EDITOR SOAL ---
   const [selectedSubtest, setSelectedSubtest] = useState('pu');
-  const [questionType, setQuestionType] = useState('pilihan_ganda'); // 'pilihan_ganda' | 'pilihan_majemuk' | 'isian'
+  
+  // Tipe Soal: 'pilihan_ganda' | 'pilihan_majemuk' | 'isian'
+  const [questionType, setQuestionType] = useState('pilihan_ganda'); 
+  
   const [questionText, setQuestionText] = useState('');
   const [questionImage, setQuestionImage] = useState('');
   const [options, setOptions] = useState(['', '', '', '', '']);
-  const [correctAnswer, setCorrectAnswer] = useState('A'); // Bisa 'A' (string) atau ['A','B'] (array) atau 'Jawabannya' (string)
+  
+  // correctAnswer bisa berupa String ('A') atau Array (['A','B']) atau String Teks ('Jawaban')
+  const [correctAnswer, setCorrectAnswer] = useState('A'); 
+  
   const [editingId, setEditingId] = useState(null);
   const [isSending, setIsSending] = useState(false); 
 
-  // Load Bank Soal saat Login Sukses
+  // --- INITIAL LOAD ---
   useEffect(() => {
     const loadBankSoal = async () => {
       const loaded = {};
@@ -53,12 +66,18 @@ const UTBKAdminApp = () => {
         try {
           const docRef = doc(db, 'bank_soal', subtest.id);
           const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) loaded[subtest.id] = docSnap.data().questions;
-          else loaded[subtest.id] = [];
-        } catch (error) { loaded[subtest.id] = []; }
+          if (docSnap.exists()) {
+              loaded[subtest.id] = docSnap.data().questions;
+          } else {
+              loaded[subtest.id] = [];
+          }
+        } catch (error) { 
+            loaded[subtest.id] = []; 
+        }
       }
       setBankSoal(loaded);
     };
+
     if (screen === 'dashboard') {
         loadBankSoal();
     }
@@ -71,7 +90,9 @@ const UTBKAdminApp = () => {
           await signInWithEmailAndPassword(auth, adminEmail, adminPassword); 
           setScreen('dashboard'); 
           loadTokens(); 
-      } catch (error) { alert('Login Gagal. Cek email/password.'); } 
+      } catch (error) { 
+          alert('Login Gagal. Periksa email dan password.'); 
+      } 
   };
   
   const handleLogout = async () => { 
@@ -84,13 +105,19 @@ const UTBKAdminApp = () => {
       const s = await getDocs(collection(db, 'tokens')); 
       const t = []; 
       s.forEach((d) => t.push(d.data())); 
+      // Sort by CreatedAt Descending
       t.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); 
       setTokenList(t); 
   };
 
   const createToken = async () => {
-    if (!newTokenName || !newTokenPhone) { alert('Isi Nama & No WA!'); return; }
+    if (!newTokenName || !newTokenPhone) { 
+        alert('Harap isi Nama Siswa dan No WhatsApp!'); 
+        return; 
+    }
+    
     const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    
     try { 
         await setDoc(doc(db, 'tokens', tokenCode), { 
             tokenCode, 
@@ -102,35 +129,44 @@ const UTBKAdminApp = () => {
             sentMethod: '-' 
         });
         
-        if(confirm(`Token Dibuat: ${tokenCode}\nKirim sekarang?`)) {
-            if (autoSendMode === 'fonnte') await sendFonnteMessage(newTokenName, newTokenPhone, tokenCode);
-            else if (autoSendMode === 'manual_web') await sendManualWeb(newTokenName, newTokenPhone, tokenCode);
+        if(confirm(`Token Berhasil Dibuat: ${tokenCode}\nApakah ingin mengirim ke WhatsApp sekarang?`)) {
+            if (autoSendMode === 'fonnte') {
+                await sendFonnteMessage(newTokenName, newTokenPhone, tokenCode);
+            } else if (autoSendMode === 'manual_web') {
+                await sendManualWeb(newTokenName, newTokenPhone, tokenCode);
+            }
         } else { 
             loadTokens(); 
         }
+        
         setNewTokenName(''); 
         setNewTokenPhone(''); 
-    } catch (error) { alert('Gagal membuat token.'); }
+    } catch (error) { 
+        alert('Gagal membuat token baru.'); 
+    }
   };
 
   const deleteToken = async (code) => { 
-      if(confirm('Yakin hapus token ini?')) { 
+      if(confirm('Apakah Anda yakin ingin menghapus token ini? Data tidak bisa dikembalikan.')) { 
           await deleteDoc(doc(db, 'tokens', code)); 
           loadTokens(); 
       }
   };
 
   const deleteAllTokens = async () => { 
-      if (!confirm("⚠️ BAHAYA: Hapus SEMUA token? Data tidak bisa kembali!")) return; 
+      if (!confirm("⚠️ PERINGATAN BAHAYA: \nApakah Anda yakin ingin MENGHAPUS SEMUA TOKEN?\nData yang dihapus tidak dapat dikembalikan!")) return; 
+      
       await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); 
       loadTokens(); 
   };
 
   const resetLeaderboard = async () => {
-    if (!confirm("⚠️ Reset Score siswa? Token tetap aktif, tapi nilai jadi 0.")) return;
+    if (!confirm("⚠️ Apakah Anda yakin ingin MERESET SEMUA SKOR?\nToken akan tetap aktif, tetapi nilai siswa akan dihapus.")) return;
+    
     try {
         const querySnapshot = await getDocs(collection(db, 'tokens'));
         const updates = [];
+        
         querySnapshot.forEach((docSnap) => {
              if (docSnap.data().score !== undefined) {
                  updates.push(updateDoc(docSnap.ref, { 
@@ -140,271 +176,428 @@ const UTBKAdminApp = () => {
                  }));
              }
         });
+        
         await Promise.all(updates); 
         alert("✅ Leaderboard Berhasil Direset!"); 
         loadTokens();
-    } catch (error) { console.error(error); alert("Gagal reset leaderboard."); }
+    } catch (error) { 
+        console.error(error); 
+        alert("Terjadi kesalahan saat mereset leaderboard."); 
+    }
   };
 
   // --- WHATSAPP SENDING ---
   const markAsSent = async (tokenCode, method) => { 
       try { 
           const tokenRef = doc(db, 'tokens', tokenCode); 
-          await updateDoc(tokenRef, { isSent: true, sentMethod: method, sentAt: new Date().toISOString() }); 
+          await updateDoc(tokenRef, { 
+              isSent: true, 
+              sentMethod: method, 
+              sentAt: new Date().toISOString() 
+          }); 
           loadTokens(); 
-      } catch (error) { console.error(error); } 
+      } catch (error) { 
+          console.error(error); 
+      } 
   };
   
   const sendFonnteMessage = async (name, phone, token) => {
-    if (!FONNTE_TOKEN) { alert("Token Fonnte belum dipasang di .env!"); return; }
-    setIsSending(true);
-    let formattedPhone = phone.toString().replace(/\D/g, '');
-    if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
+    if (!FONNTE_TOKEN) { 
+        alert("Token Fonnte belum dipasang di konfigurasi (.env)!"); 
+        return; 
+    }
     
-    const message = `Halo *${name}*,\n\nBerikut akses ujian simulasi kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\nSelamat mengerjakan dan semoga sukses!`;
+    setIsSending(true);
+    
+    // Format Phone Number (08 -> 628)
+    let formattedPhone = phone.toString().replace(/\D/g, '');
+    if (formattedPhone.startsWith('0')) {
+        formattedPhone = '62' + formattedPhone.slice(1);
+    }
+    
+    const message = `Halo *${name}*,\n\nBerikut adalah akses untuk Ujian Simulasi UTBK SNBT kamu:\n\n🔑 Token: *${token}*\n🔗 Link Ujian: ${STUDENT_APP_URL}\n\nSelamat mengerjakan dan semoga sukses!`;
     
     try {
-        const params = new URLSearchParams({ token: FONNTE_TOKEN, target: formattedPhone, message: message, delay: SEND_DELAY, countryCode: '62' });
-        await fetch(`https://api.fonnte.com/send?${params.toString()}`, { method: 'GET', mode: 'no-cors' });
+        const params = new URLSearchParams({ 
+            token: FONNTE_TOKEN, 
+            target: formattedPhone, 
+            message: message, 
+            delay: SEND_DELAY, 
+            countryCode: '62' 
+        });
+        
+        await fetch(`https://api.fonnte.com/send?${params.toString()}`, { 
+            method: 'GET', 
+            mode: 'no-cors' 
+        });
+        
         await markAsSent(token, 'Fonnte (Auto)'); 
-        alert(`✅ Pesan terkirim ke ${name}`);
-    } catch (error) { alert("❌ Gagal mengirim via Fonnte."); } 
-    finally { setIsSending(false); }
+        alert(`✅ Pesan berhasil dikirim ke ${name}`);
+    } catch (error) { 
+        alert("❌ Gagal mengirim pesan via Fonnte."); 
+    } finally { 
+        setIsSending(false); 
+    }
   };
 
   const sendManualWeb = async (name, phone, token) => { 
       let p = phone.replace(/\D/g, ''); 
       if (p.startsWith('0')) p = '62' + p.slice(1); 
-      window.open(`https://wa.me/${p}?text=${encodeURIComponent(`Halo *${name}*, Token: *${token}*, Link: ${STUDENT_APP_URL}`)}`, '_blank'); 
+      
+      const text = `Halo *${name}*, Token: *${token}*, Link: ${STUDENT_APP_URL}`;
+      window.open(`https://wa.me/${p}?text=${encodeURIComponent(text)}`, '_blank'); 
+      
       await markAsSent(token, 'WA Web'); 
   };
 
-  const isExpired = (c) => (Date.now() - new Date(c).getTime()) > 24 * 60 * 60 * 1000;
+  const isExpired = (createdAt) => {
+      return (Date.now() - new Date(createdAt).getTime()) > 24 * 60 * 60 * 1000;
+  };
   
   const getFilteredList = () => { 
       switch (filterStatus) { 
-          case 'active': return tokenList.filter(t => t.status==='active' && !isExpired(t.createdAt)); 
-          case 'used': return tokenList.filter(t => t.status==='used'); 
-          case 'expired': return tokenList.filter(t => isExpired(t.createdAt)); 
-          default: return tokenList; 
+          case 'active': 
+              return tokenList.filter(t => t.status === 'active' && !isExpired(t.createdAt)); 
+          case 'used': 
+              return tokenList.filter(t => t.status === 'used'); 
+          case 'expired': 
+              return tokenList.filter(t => isExpired(t.createdAt)); 
+          default: 
+              return tokenList; 
       } 
   };
 
   // ==========================================
-  // --- LOGIC BANK SOAL (FITUR BARU) ---
+  // --- LOGIC BANK SOAL (VERSI LENGKAP) ---
   // ==========================================
 
-  // Simpan ke Firebase
-  const saveSoal = async (sid, q) => { 
-      await setDoc(doc(db, 'bank_soal', sid), { questions: q }); 
-      setBankSoal(p => ({ ...p, [sid]: q })); 
+  const saveSoal = async (subtestId, questionsData) => { 
+      await setDoc(doc(db, 'bank_soal', subtestId), { 
+          questions: questionsData 
+      }); 
+      setBankSoal(prev => ({ ...prev, [subtestId]: questionsData })); 
   };
   
-  // Fungsi Tambah / Update Soal
   const addOrUpdate = async () => {
-    // Validasi Dasar
-    if (!questionText.trim()) { alert('Pertanyaan wajib diisi!'); return; }
-    
-    // Validasi Opsi (Kecuali Isian)
-    if (questionType !== 'isian' && options.some(o => !o.trim())) { 
-        alert('Semua opsi A-E wajib diisi!'); return; 
+    // 1. Validasi Input Dasar
+    if (!questionText.trim()) { 
+        alert('Pertanyaan wajib diisi!'); 
+        return; 
     }
     
-    // Validasi Kunci Jawaban
+    // 2. Validasi Opsi (Kecuali Tipe Isian)
+    if (questionType !== 'isian' && options.some(o => !o.trim())) { 
+        alert('Semua opsi jawaban A-E wajib diisi!'); 
+        return; 
+    }
+    
+    // 3. Validasi Kunci Jawaban
     if (questionType === 'pilihan_majemuk' && (!Array.isArray(correctAnswer) || correctAnswer.length === 0)) {
-        alert('Pilih minimal 1 kunci jawaban benar!'); return;
+        alert('Untuk Pilihan Majemuk, pilih minimal 1 kunci jawaban benar!'); 
+        return;
     }
     if (questionType === 'isian' && (!correctAnswer || correctAnswer.toString().trim() === '')) {
-        alert('Isi kunci jawaban yang benar!'); return;
+        alert('Untuk Isian, kunci jawaban tidak boleh kosong!'); 
+        return;
     }
 
-    const q = { 
+    // 4. Buat Object Soal
+    const newQuestion = { 
         id: editingId || Date.now().toString(), 
         type: questionType, // Menyimpan tipe soal
         question: questionText, 
         image: questionImage, 
-        options: questionType === 'isian' ? [] : options, // Isian tidak punya opsi
+        options: questionType === 'isian' ? [] : options, // Jika isian, opsi dikosongkan
         correct: correctAnswer 
     };
 
-    const cur = bankSoal[selectedSubtest] || [];
-    const upd = editingId ? cur.map(x => x.id === editingId ? q : x) : [...cur, q];
+    const currentQuestions = bankSoal[selectedSubtest] || [];
     
-    await saveSoal(selectedSubtest, upd); 
+    // 5. Update atau Tambah Baru
+    const updatedQuestions = editingId 
+        ? currentQuestions.map(q => q.id === editingId ? newQuestion : q) 
+        : [...currentQuestions, newQuestion];
+    
+    await saveSoal(selectedSubtest, updatedQuestions); 
     alert('Soal Berhasil Disimpan!'); 
+    
     resetForm();
   };
 
   const deleteSoal = async (id) => { 
-      if(confirm('Yakin hapus soal ini?')) {
-          await saveSoal(selectedSubtest, (bankSoal[selectedSubtest]||[]).filter(x => x.id !== id)); 
+      if(confirm('Apakah Anda yakin ingin menghapus soal ini?')) {
+          const currentQuestions = bankSoal[selectedSubtest] || [];
+          const filteredQuestions = currentQuestions.filter(x => x.id !== id);
+          await saveSoal(selectedSubtest, filteredQuestions); 
       }
   };
   
   const resetForm = () => { 
       setQuestionText(''); 
       setQuestionImage(''); 
-      setOptions(['','','','','']); 
+      setOptions(['', '', '', '', '']); 
       setEditingId(null); 
-      // Reset ke default
+      // Reset tipe ke default
       handleTypeChange('pilihan_ganda');
   };
 
-  // Handle Perubahan Tipe Soal & Reset Kunci Jawaban
   const handleTypeChange = (type) => {
       setQuestionType(type);
-      if (type === 'pilihan_ganda') setCorrectAnswer('A');
-      else if (type === 'pilihan_majemuk') setCorrectAnswer([]); // Array kosong
-      else if (type === 'isian') setCorrectAnswer(''); // String kosong
+      
+      // Reset kunci jawaban sesuai tipe yang dipilih
+      if (type === 'pilihan_ganda') {
+          setCorrectAnswer('A');
+      } else if (type === 'pilihan_majemuk') {
+          setCorrectAnswer([]); // Array kosong untuk multiple select
+      } else if (type === 'isian') {
+          setCorrectAnswer(''); // String kosong untuk input text
+      }
   };
 
-  // Logic Toggle Jawaban Majemuk (Checkbox Style)
   const toggleMajemukAnswer = (opt) => {
       let current = Array.isArray(correctAnswer) ? [...correctAnswer] : [];
-      if (current.includes(opt)) current = current.filter(x => x !== opt);
-      else current.push(opt);
+      
+      if (current.includes(opt)) {
+          // Jika sudah ada, hapus (uncheck)
+          current = current.filter(x => x !== opt);
+      } else {
+          // Jika belum ada, tambah (check)
+          current.push(opt);
+      }
       setCorrectAnswer(current);
   };
 
-  // Load Data Soal ke Form Editor
   const loadSoalForEdit = (q) => {
       setQuestionText(q.question); 
-      setQuestionImage(q.image||''); 
-      setQuestionType(q.type || 'pilihan_ganda'); // Default backward compatibility
+      setQuestionImage(q.image || ''); 
+      setQuestionType(q.type || 'pilihan_ganda'); // Default jika data lama tidak punya tipe
       
       if (q.type === 'isian') {
-          setOptions(['','','','','']);
+          setOptions(['', '', '', '', '']);
           setCorrectAnswer(q.correct);
       } else {
           setOptions([...q.options]); 
           setCorrectAnswer(q.correct);
       }
+      
       setEditingId(q.id); 
-      window.scrollTo({top:0, behavior:'smooth'});
+      
+      // Scroll ke atas agar user melihat form editor
+      window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- RENDER LOGIN ---
+  // --- RENDER HALAMAN LOGIN ---
   if (screen === 'admin_login') {
       return (
           <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100">
               <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
                   <h2 className="text-2xl font-bold mb-6 text-center text-indigo-900">Admin Portal</h2>
                   <form onSubmit={handleLogin} className="space-y-4">
-                      <input type="email" value={adminEmail} onChange={e=>setAdminEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring focus:ring-indigo-200" placeholder="Email Admin"/>
-                      <input type="password" value={adminPassword} onChange={e=>setAdminPassword(e.target.value)} className="w-full p-3 border rounded-lg focus:ring focus:ring-indigo-200" placeholder="Password"/>
-                      <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition">Masuk</button>
+                      <div>
+                          <input 
+                            type="email" 
+                            value={adminEmail} 
+                            onChange={e => setAdminEmail(e.target.value)} 
+                            className="w-full p-3 border rounded-lg focus:ring focus:ring-indigo-200 outline-none transition" 
+                            placeholder="Email Admin"
+                          />
+                      </div>
+                      <div>
+                          <input 
+                            type="password" 
+                            value={adminPassword} 
+                            onChange={e => setAdminPassword(e.target.value)} 
+                            className="w-full p-3 border rounded-lg focus:ring focus:ring-indigo-200 outline-none transition" 
+                            placeholder="Password"
+                          />
+                      </div>
+                      <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition">
+                          Masuk Dashboard
+                      </button>
                   </form>
               </div>
           </div>
       );
   }
 
-  // --- RENDER DASHBOARD ---
+  // --- RENDER DASHBOARD UTAMA ---
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* NAVBAR */}
       <div className="sticky top-0 z-40 bg-white shadow-sm px-6 py-4 flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold text-indigo-900 flex items-center gap-2"><Settings size={20}/> Admin Panel</h1>
+        <h1 className="text-xl font-bold text-indigo-900 flex items-center gap-2">
+            <Settings size={20}/> Admin Panel
+        </h1>
         <div className="flex gap-2">
-          <button onClick={() => setViewMode('tokens')} className={`px-4 py-2 rounded-lg font-medium transition ${viewMode==='tokens'?'bg-indigo-100 text-indigo-700':'text-gray-600 hover:bg-gray-100'}`}>Token Manager</button>
-          <button onClick={() => setViewMode('soal')} className={`px-4 py-2 rounded-lg font-medium transition ${viewMode==='soal'?'bg-indigo-100 text-indigo-700':'text-gray-600 hover:bg-gray-100'}`}>Bank Soal</button>
-          <button onClick={handleLogout} className="text-red-600 px-3 hover:bg-red-50 rounded-lg"><LogOut size={20}/></button>
+          <button 
+            onClick={() => setViewMode('tokens')} 
+            className={`px-4 py-2 rounded-lg font-medium transition ${viewMode === 'tokens' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
+          >
+            Token Manager
+          </button>
+          <button 
+            onClick={() => setViewMode('soal')} 
+            className={`px-4 py-2 rounded-lg font-medium transition ${viewMode === 'soal' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
+          >
+            Bank Soal
+          </button>
+          <button onClick={handleLogout} className="text-red-600 px-3 hover:bg-red-50 rounded-lg transition">
+            <LogOut size={20}/>
+          </button>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-4 flex-1 w-full">
+      <div className="max-w-7xl mx-auto p-4 flex-1 w-full">
         {viewMode === 'tokens' ? (
-          /* --- TAB TOKEN MANAGER --- */
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             {/* Form Buat Token */}
-             <div className="bg-white p-6 rounded-xl shadow-sm h-fit border border-gray-100">
-                <h2 className="font-bold mb-4 flex items-center gap-2 text-gray-800"><Plus size={18}/> Buat Token Baru</h2>
-                
-                {/* Opsi Kirim */}
-                <div className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                    <p className="text-xs font-bold text-gray-500 mb-2 uppercase flex items-center gap-1"><Zap size={12}/> Metode Kirim:</p>
-                    <div className="flex flex-col gap-2">
-                        <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'fonnte' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-white border-gray-300'}`}>
-                            <input type="radio" name="sendMode" value="fonnte" checked={autoSendMode === 'fonnte'} onChange={() => setAutoSendMode('fonnte')} className="hidden" />
-                            <Smartphone size={14}/> Auto WhatsApp (Fonnte API)
-                        </label>
-                        <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'manual_web' ? 'bg-blue-100 border-blue-400 text-blue-700' : 'bg-white border-gray-300'}`}>
-                            <input type="radio" name="sendMode" value="manual_web" checked={autoSendMode === 'manual_web'} onChange={() => setAutoSendMode('manual_web')} className="hidden" />
-                            <ExternalLink size={14}/> Manual (WhatsApp Web)
-                        </label>
-                    </div>
-                </div>
+          /* --- UI TOKEN MANAGER (TAMPILAN BARU) --- */
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+             {/* PANEL KIRI: BUAT TOKEN */}
+             <div className="md:col-span-1">
+               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-24">
+                 <h2 className="font-bold text-lg mb-6 flex items-center gap-2 text-gray-800">
+                    <Plus size={20} className="text-indigo-600"/> Buat Token Baru
+                 </h2>
 
-                <div className="space-y-3">
-                    <input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-100" placeholder="Nama Siswa"/>
-                    <input value={newTokenPhone} onChange={e=>setNewTokenPhone(e.target.value)} className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-100" placeholder="No WhatsApp (08xxx)"/>
-                    <button onClick={createToken} disabled={isSending} className={`w-full py-2 rounded text-white font-bold transition ${isSending ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-                        {isSending ? 'Mengirim...' : 'Generate & Kirim'}
+                 {/* Pilihan Metode Kirim */}
+                 <div className="mb-6">
+                    <p className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider flex items-center gap-1">
+                        <Zap size={12}/> Metode Kirim:
+                    </p>
+                    <div className="flex flex-col gap-3">
+                      <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'fonnte' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                        <input type="radio" className="hidden" checked={autoSendMode === 'fonnte'} onChange={()=>setAutoSendMode('fonnte')} />
+                        <Smartphone size={18}/> <span className="font-bold text-sm">Auto WhatsApp (Fonnte)</span>
+                      </label>
+                      <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'manual_web' ? 'border-gray-800 bg-gray-50 text-gray-800' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                        <input type="radio" className="hidden" checked={autoSendMode === 'manual_web'} onChange={()=>setAutoSendMode('manual_web')} />
+                        <ExternalLink size={18}/> <span className="font-bold text-sm">Manual (WhatsApp Web)</span>
+                      </label>
+                    </div>
+                 </div>
+
+                 {/* Input Data Siswa */}
+                 <div className="space-y-4">
+                    <input 
+                        value={newTokenName} 
+                        onChange={e => setNewTokenName(e.target.value)} 
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" 
+                        placeholder="Nama Siswa"
+                    />
+                    <input 
+                        value={newTokenPhone} 
+                        onChange={e => setNewTokenPhone(e.target.value)} 
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" 
+                        placeholder="No WhatsApp (08xxx)"
+                    />
+                    <button 
+                        onClick={createToken} 
+                        disabled={isSending} 
+                        className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-transform transform active:scale-95 flex justify-center items-center gap-2 ${isSending ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                    >
+                      {isSending ? 'Mengirim...' : 'Generate & Kirim'} <Send size={16}/>
                     </button>
-                </div>
+                 </div>
+               </div>
              </div>
 
-             {/* List Token */}
-             <div className="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="font-bold text-lg text-gray-800">Daftar Token</h2>
-                    <div className="flex gap-2">
-                        <button onClick={resetLeaderboard} className="text-orange-600 text-xs border border-orange-200 px-3 py-1.5 rounded-lg bg-orange-50 font-bold hover:bg-orange-100 flex items-center gap-1"><RefreshCw size={12}/> Reset Score</button>
-                        <button onClick={loadTokens} className="text-indigo-600 text-xs font-bold hover:bg-indigo-50 px-3 py-1.5 rounded-lg">Refresh</button>
-                        <button onClick={deleteAllTokens} className="text-red-600 text-xs font-bold hover:bg-red-50 px-3 py-1.5 rounded-lg">Hapus Semua</button>
-                    </div>
-                </div>
-                
-                {/* Filter */}
-                <div className="flex gap-2 mb-4">
-                    {['all', 'active', 'used', 'expired'].map(status => (
-                        <button key={status} onClick={() => setFilterStatus(status)} className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${filterStatus === status ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
-                            {status}
+             {/* PANEL KANAN: DAFTAR TOKEN */}
+             <div className="md:col-span-2">
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 min-h-[600px]">
+                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                      <div>
+                          <h2 className="text-xl font-bold text-gray-800">Daftar Token</h2>
+                          <p className="text-sm text-gray-400">Kelola akses ujian siswa</p>
+                      </div>
+                      <div className="flex gap-3">
+                        <button onClick={resetLeaderboard} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-orange-600 font-bold bg-orange-50 border border-orange-100 hover:bg-orange-100 transition text-xs">
+                            <RefreshCw size={14}/> Reset Score
                         </button>
-                    ))}
-                </div>
+                        <button onClick={loadTokens} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-indigo-600 font-bold hover:bg-indigo-50 transition text-xs">
+                            Refresh
+                        </button>
+                        <button onClick={deleteAllTokens} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-red-600 font-bold hover:bg-red-50 transition text-xs">
+                            Hapus Semua
+                        </button>
+                      </div>
+                   </div>
 
-                <div className="overflow-auto max-h-[500px]">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 sticky top-0">
-                            <tr><th className="p-3 rounded-tl-lg">Kode</th><th className="p-3">Nama</th><th className="p-3">Status</th><th className="p-3">Score</th><th className="p-3 text-center rounded-tr-lg">Aksi</th></tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {getFilteredList().map(t=>(
-                                <tr key={t.tokenCode} className="hover:bg-gray-50">
-                                    <td className="p-3 font-mono font-bold text-indigo-600">{t.tokenCode}</td>
-                                    <td className="p-3 font-medium">{t.studentName}</td>
-                                    <td className="p-3">
-                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${t.status==='active'?'bg-green-100 text-green-700': t.status==='used'?'bg-blue-100 text-blue-700':'bg-gray-200 text-gray-600'}`}>
-                                            {t.status}
-                                        </span>
-                                    </td>
-                                    <td className="p-3 font-bold text-gray-600">{t.score !== undefined ? t.score : '-'}</td>
-                                    <td className="p-3 text-center"><button onClick={()=>deleteToken(t.tokenCode)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button></td>
+                   {/* Filter Kapsul */}
+                   <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                      {['all', 'active', 'used', 'expired'].map(status => (
+                         <button 
+                            key={status} 
+                            onClick={() => setFilterStatus(status)} 
+                            className={`px-5 py-2 rounded-full text-sm font-bold capitalize transition-all ${filterStatus === status ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                         >
+                            {status}
+                         </button>
+                      ))}
+                   </div>
+
+                   {/* Tabel Token */}
+                   <div className="overflow-hidden rounded-xl border border-gray-100">
+                      <table className="w-full text-sm text-left">
+                         <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wider font-bold">
+                            <tr>
+                                <th className="p-4">Kode</th>
+                                <th className="p-4">Nama</th>
+                                <th className="p-4">Status</th>
+                                <th className="p-4">Score</th>
+                                <th className="p-4 text-center">Aksi</th>
+                            </tr>
+                         </thead>
+                         <tbody className="divide-y divide-gray-50">
+                            {getFilteredList().length > 0 ? getFilteredList().map(t => (
+                               <tr key={t.tokenCode} className="hover:bg-gray-50 transition">
+                                  <td className="p-4 font-mono font-bold text-indigo-600">{t.tokenCode}</td>
+                                  <td className="p-4 font-semibold text-gray-700">{t.studentName}</td>
+                                  <td className="p-4">
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${t.status === 'active' ? 'bg-green-100 text-green-700' : t.status === 'used' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
+                                        {t.status}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 font-bold text-gray-600">{t.score !== undefined ? t.score : '-'}</td>
+                                  <td className="p-4 text-center">
+                                    <button onClick={() => deleteToken(t.tokenCode)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition">
+                                        <Trash2 size={18}/>
+                                    </button>
+                                  </td>
+                               </tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan="5" className="p-8 text-center text-gray-400 italic">Tidak ada data token ditemukan.</td>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {getFilteredList().length === 0 && <p className="text-center text-gray-400 py-8 italic">Tidak ada data token.</p>}
+                            )}
+                         </tbody>
+                      </table>
+                   </div>
                 </div>
              </div>
           </div>
         ) : (
-          /* --- TAB BANK SOAL (EDITOR) --- */
+          /* --- UI EDITOR SOAL (VERSI LENGKAP DENGAN TOGGLE) --- */
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
              <div className="flex justify-between items-center mb-6">
                  <h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2>
              </div>
              
-             {/* FORM INPUT SOAL */}
+             {/* Form Input Soal */}
              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
                
                {/* Pilih Subtest */}
-               <select value={selectedSubtest} onChange={e => { setSelectedSubtest(e.target.value); resetForm(); }} className="w-full p-3 border rounded-lg mb-6 bg-white font-medium text-gray-700 shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none">
-                   {SUBTESTS.map(s => <option key={s.id} value={s.id}>{s.name} ({bankSoal[s.id]?.length || 0} / {s.questions})</option>)}
+               <select 
+                    value={selectedSubtest} 
+                    onChange={e => { setSelectedSubtest(e.target.value); resetForm(); }} 
+                    className="w-full p-3 border rounded-lg mb-6 bg-white font-medium text-gray-700 shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none"
+               >
+                   {SUBTESTS.map(s => (
+                       <option key={s.id} value={s.id}>
+                           {s.name} ({bankSoal[s.id]?.length || 0} / {s.questions})
+                       </option>
+                   ))}
                </select>
                
-               {/* TOGGLE TIPE SOAL (FITUR BARU YANG KAMU CARI) */}
+               {/* TOGGLE TIPE SOAL (FITUR UTAMA) */}
                <div className="mb-6">
                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Format Soal:</label>
                  <div className="flex flex-wrap gap-2">
@@ -423,29 +616,54 @@ const UTBKAdminApp = () => {
                  </div>
                </div>
 
-               {/* Input Pertanyaan */}
-               <textarea value={questionText} onChange={e => setQuestionText(e.target.value)} className="w-full p-4 border rounded-lg mb-4 focus:ring-2 focus:ring-indigo-100 outline-none" rows="3" placeholder="Ketik Pertanyaan di sini (Support LaTeX dengan $...$)..." />
-               <input value={questionImage} onChange={e => setQuestionImage(e.target.value)} className="w-full p-3 border rounded-lg mb-6 text-sm" placeholder="URL Gambar (Opsional)..." />
+               {/* Textarea Pertanyaan */}
+               <textarea 
+                    value={questionText} 
+                    onChange={e => setQuestionText(e.target.value)} 
+                    className="w-full p-4 border rounded-lg mb-4 focus:ring-2 focus:ring-indigo-100 outline-none" 
+                    rows="3" 
+                    placeholder="Ketik Pertanyaan di sini (Support LaTeX dengan $...$)..." 
+               />
+               <input 
+                    value={questionImage} 
+                    onChange={e => setQuestionImage(e.target.value)} 
+                    className="w-full p-3 border rounded-lg mb-6 text-sm" 
+                    placeholder="URL Gambar (Opsional)..." 
+               />
                
-               {/* LOGIKA INPUT OPSI & KUNCI JAWABAN */}
+               {/* LOGIKA OPSI & KUNCI JAWABAN (CONDITIONAL RENDERING) */}
                {questionType !== 'isian' ? (
                    <>
+                     {/* Opsi A-E */}
                      <div className="space-y-3 mb-6">
                         {options.map((o, i) => (
                             <div key={i} className="flex gap-3 items-center">
-                                <span className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-100 font-bold rounded-lg text-indigo-700">{['A','B','C','D','E'][i]}</span>
-                                <input value={o} onChange={e => {const n=[...options];n[i]=e.target.value;setOptions(n)}} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none" placeholder={`Pilihan Jawaban ${['A','B','C','D','E'][i]}`} />
+                                <span className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-100 font-bold rounded-lg text-indigo-700">
+                                    {['A','B','C','D','E'][i]}
+                                </span>
+                                <input 
+                                    value={o} 
+                                    onChange={e => {const n=[...options];n[i]=e.target.value;setOptions(n)}} 
+                                    className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none" 
+                                    placeholder={`Pilihan Jawaban ${['A','B','C','D','E'][i]}`} 
+                                />
                             </div>
                         ))}
                      </div>
                      
+                     {/* Tombol Kunci Jawaban */}
                      <div className="mb-4">
-                        <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):</label>
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">
+                            Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):
+                        </label>
                         <div className="flex gap-3">
                             {['A','B','C','D','E'].map(l => {
-                                const isSelected = questionType === 'pilihan_ganda' ? correctAnswer === l : correctAnswer.includes(l);
+                                const isSelected = questionType === 'pilihan_ganda' 
+                                    ? correctAnswer === l 
+                                    : correctAnswer.includes(l);
                                 return (
-                                    <button key={l} 
+                                    <button 
+                                        key={l} 
                                         onClick={() => {
                                             if (questionType === 'pilihan_ganda') setCorrectAnswer(l);
                                             else toggleMajemukAnswer(l);
@@ -462,21 +680,37 @@ const UTBKAdminApp = () => {
                ) : (
                    /* INPUT KHUSUS TIPE ISIAN */
                    <div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200">
-                       <label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1"><Key size={14}/> Kunci Jawaban (Teks/Angka):</label>
-                       <input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)} className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" placeholder="Contoh: 25 atau Jakarta" />
-                       <p className="text-xs text-green-600 mt-2 font-medium">*Sistem tidak membedakan huruf besar/kecil (case-insensitive).</p>
+                       <label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1">
+                           <Key size={14}/> Kunci Jawaban (Teks/Angka):
+                       </label>
+                       <input 
+                            value={correctAnswer} 
+                            onChange={e => setCorrectAnswer(e.target.value)} 
+                            className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" 
+                            placeholder="Contoh: 25 atau Jakarta" 
+                       />
+                       <p className="text-xs text-green-600 mt-2 font-medium">
+                           *Sistem tidak membedakan huruf besar/kecil (case-insensitive).
+                       </p>
                    </div>
                )}
 
                <div className="flex gap-3 pt-4 border-t border-gray-200">
-                   <button onClick={addOrUpdate} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5">
+                   <button 
+                        onClick={addOrUpdate} 
+                        className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5"
+                   >
                        {editingId ? 'Simpan Perubahan' : 'Tambah Soal Baru'}
                    </button>
-                   {editingId && <button onClick={resetForm} className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100">Batal Edit</button>}
+                   {editingId && (
+                       <button onClick={resetForm} className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100">
+                           Batal Edit
+                       </button>
+                   )}
                </div>
              </div>
 
-             {/* PREVIEW LIST SOAL */}
+             {/* LIST SOAL PREVIEW */}
              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                  {(bankSoal[selectedSubtest]||[]).map((q, i) => (
                      <div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group">
@@ -493,12 +727,18 @@ const UTBKAdminApp = () => {
                             </div>
                         </div>
                         <div className="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition">
-                            <button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button>
-                            <button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
+                            <button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded">
+                                <Edit size={18}/>
+                            </button>
+                            <button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded">
+                                <Trash2 size={18}/>
+                            </button>
                         </div>
                      </div>
                  ))}
-                 {(bankSoal[selectedSubtest]||[]).length === 0 && <p className="text-center text-gray-400 py-10 italic border-2 border-dashed rounded-xl">Belum ada soal di subtest ini.</p>}
+                 {(bankSoal[selectedSubtest]||[]).length === 0 && (
+                     <p className="text-center text-gray-400 py-10 italic border-2 border-dashed rounded-xl">Belum ada soal di subtest ini.</p>
+                 )}
              </div>
           </div>
         )}
