@@ -1,16 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, 
-  MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
-  CheckCircle2, XCircle, RefreshCw, List, CheckSquare, Type, Trophy, X 
+  Edit, 
+  Plus, 
+  Trash2, 
+  LogOut, 
+  Key, 
+  BarChart3, 
+  Filter, 
+  Copyright, 
+  MessageCircle, 
+  Send, 
+  ExternalLink, 
+  Zap, 
+  Settings, 
+  Radio, 
+  Smartphone, 
+  CheckCircle2, 
+  XCircle, 
+  RefreshCw, 
+  List, 
+  CheckSquare, 
+  Type, 
+  Trophy, 
+  X, 
+  Server // Icon untuk Backup Server
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import { 
-  doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, deleteField 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  collection, 
+  getDocs, 
+  deleteDoc, 
+  deleteField 
 } from 'firebase/firestore'; 
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
-// --- KONFIGURASI ---
+// ==========================================
+// KONFIGURASI CONSTANT
+// ==========================================
 const SUBTESTS = [
   { id: 'pu', name: 'Penalaran Umum', questions: 30 },
   { id: 'ppu', name: 'Pengetahuan & Pemahaman Umum', questions: 20 },
@@ -23,16 +53,20 @@ const SUBTESTS = [
 
 const STUDENT_APP_URL = "https://utbk-simulation-tester-student.vercel.app"; 
 const FONNTE_TOKEN = import.meta.env.VITE_FONNTE_TOKEN; 
+const BACKUP_TOKEN = import.meta.env.VITE_BACKUP_TOKEN; 
+const BACKUP_URL = import.meta.env.VITE_BACKUP_URL; 
 const SEND_DELAY = 3; 
 
 const UTBKAdminApp = () => {
-  // --- STATE MANAGEMENT ---
+  // ==========================================
+  // STATE MANAGEMENT
+  // ==========================================
   const [screen, setScreen] = useState('admin_login'); 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [viewMode, setViewMode] = useState('tokens'); 
   
-  // Data State
+  // Data Lists
   const [tokenList, setTokenList] = useState([]);
   const [bankSoal, setBankSoal] = useState({});
   const [filterStatus, setFilterStatus] = useState('all');
@@ -46,7 +80,7 @@ const UTBKAdminApp = () => {
   // Leaderboard Modal State
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  // --- STATE EDITOR SOAL ---
+  // Editor Soal State
   const [selectedSubtest, setSelectedSubtest] = useState('pu');
   const [questionType, setQuestionType] = useState('pilihan_ganda'); 
   const [questionText, setQuestionText] = useState('');
@@ -55,7 +89,9 @@ const UTBKAdminApp = () => {
   const [correctAnswer, setCorrectAnswer] = useState('A'); 
   const [editingId, setEditingId] = useState(null);
 
-  // --- INITIAL LOAD ---
+  // ==========================================
+  // INITIAL LOAD & AUTH
+  // ==========================================
   useEffect(() => {
     const loadBankSoal = async () => {
       const loaded = {};
@@ -80,7 +116,6 @@ const UTBKAdminApp = () => {
     }
   }, [screen]);
 
-  // --- AUTH FUNCTIONS ---
   const handleLogin = async (e) => { 
       e.preventDefault(); 
       try { 
@@ -98,64 +133,133 @@ const UTBKAdminApp = () => {
   };
 
   // ==========================================
-  // --- LOGIC TOKEN (SNIPPET 1 INTEGRATION) ---
+  // LOGIC TOKEN & SENDING (3 METHODS)
   // ==========================================
+
+  const loadTokens = async () => { 
+      const s = await getDocs(collection(db, 'tokens')); 
+      const t = []; 
+      s.forEach((d) => t.push(d.data())); 
+      t.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); 
+      setTokenList(t); 
+  };
 
   const markAsSent = async (tokenCode, method) => { 
       try { 
           const tokenRef = doc(db, 'tokens', tokenCode); 
-          await updateDoc(tokenRef, { isSent: true, sentMethod: method, sentAt: new Date().toISOString() }); 
+          await updateDoc(tokenRef, { 
+              isSent: true, 
+              sentMethod: method, 
+              sentAt: new Date().toISOString() 
+          }); 
           loadTokens(); 
-      } catch (error) { console.error(error); } 
+      } catch (error) { 
+          console.error("Error updating status:", error); 
+      } 
   };
   
+  // 1. ENGINE UTAMA (FONNTE)
   const sendFonnteMessage = async (name, phone, token) => {
     if (!FONNTE_TOKEN) { alert("Token Fonnte Kosong!"); return; }
     setIsSending(true);
+    
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\nSelamat mengerjakan!`;
+    
+    const message = `Halo *${name}*,\n\nBerikut akses ujian simulasi kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\nSelamat mengerjakan!`;
+    
     try {
         const params = new URLSearchParams({ token: FONNTE_TOKEN, target: formattedPhone, message: message, delay: SEND_DELAY, countryCode: '62' });
         await fetch(`https://api.fonnte.com/send?${params.toString()}`, { method: 'GET', mode: 'no-cors' });
-        await markAsSent(token, 'Fonnte (Auto)'); alert(`✅ Terkirim ke ${name}`);
-    } catch (error) { alert("❌ Gagal Fonnte."); } finally { setIsSending(false); }
+        await markAsSent(token, 'Fonnte (Auto)'); 
+        alert(`✅ Terkirim ke ${name} (Fonnte)`);
+    } catch (error) { alert("❌ Gagal Fonnte."); } 
+    finally { setIsSending(false); }
   };
 
-  const sendJsDirect = async (name, phone, token) => { 
-      let p = phone.replace(/\D/g, ''); 
-      if (p.startsWith('0')) p = '62' + p.slice(1); 
-      window.location.href = `whatsapp://send?phone=${p}&text=${encodeURIComponent(`Halo *${name}*, Token: *${token}*, Link: ${STUDENT_APP_URL}`)}`; 
-      await markAsSent(token, 'JS App'); 
+  // 2. ENGINE CADANGAN (BACKUP)
+  const sendBackupMessage = async (name, phone, token) => {
+    if (!BACKUP_TOKEN) { alert("Token Backup Kosong!"); return; }
+    setIsSending(true);
+
+    let formattedPhone = phone.toString().replace(/\D/g, '');
+    if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
+
+    const message = `Halo *${name}*,\n\nBerikut akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\nSelamat mengerjakan!`;
+
+    try {
+        const params = new URLSearchParams({ token: BACKUP_TOKEN, number: formattedPhone, message: message });
+        await fetch(`${BACKUP_URL}?${params.toString()}`, { method: 'GET', mode: 'no-cors' });
+        await markAsSent(token, 'Backup Provider');
+        alert(`🟠 Terkirim ke ${name} (Backup)`);
+    } catch (error) { alert("❌ Gagal Backup."); } 
+    finally { setIsSending(false); }
   };
 
-  const sendManualWeb = async (name, phone, token) => { 
+  // 3. ENGINE MANUAL (WA APP)
+  const sendManualApp = async (name, phone, token) => { 
       let p = phone.replace(/\D/g, ''); 
       if (p.startsWith('0')) p = '62' + p.slice(1); 
-      window.open(`https://wa.me/${p}?text=${encodeURIComponent(`Halo *${name}*, Token: *${token}*, Link: ${STUDENT_APP_URL}`)}`, '_blank'); 
-      await markAsSent(token, 'WA Web'); 
+      
+      const text = `Halo *${name}*, Token: *${token}*, Link: ${STUDENT_APP_URL}`;
+      window.open(`https://api.whatsapp.com/send?phone=${p}&text=${encodeURIComponent(text)}`, '_blank'); 
+      
+      await markAsSent(token, 'Manual App'); 
   };
 
   const createToken = async () => {
     if (!newTokenName || !newTokenPhone) { alert('Isi data!'); return; }
+    
     const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    
     try { 
-        await setDoc(doc(db, 'tokens', tokenCode), { tokenCode, studentName: newTokenName, studentPhone: newTokenPhone, status: 'active', createdAt: new Date().toISOString(), isSent: false, sentMethod: '-' });
-        if(confirm(`Kirim token ${tokenCode}?`)) {
+        await setDoc(doc(db, 'tokens', tokenCode), { 
+            tokenCode, 
+            studentName: newTokenName, 
+            studentPhone: newTokenPhone, 
+            status: 'active', 
+            createdAt: new Date().toISOString(), 
+            isSent: false, 
+            sentMethod: '-' 
+        });
+        
+        let modeLabel = "";
+        if (autoSendMode === 'fonnte') modeLabel = "UTAMA (Fonnte)";
+        else if (autoSendMode === 'backup') modeLabel = "CADANGAN (Backup)";
+        else modeLabel = "MANUAL (WA App)";
+
+        if(confirm(`Token Berhasil: ${tokenCode}\n\nKirim via ${modeLabel}?`)) {
             if (autoSendMode === 'fonnte') await sendFonnteMessage(newTokenName, newTokenPhone, tokenCode);
-            else if (autoSendMode === 'js_app') await sendJsDirect(newTokenName, newTokenPhone, tokenCode);
-            else await sendManualWeb(newTokenName, newTokenPhone, tokenCode);
-        } else { loadTokens(); }
-        setNewTokenName(''); setNewTokenPhone(''); 
-    } catch (error) { alert('Gagal.'); }
+            else if (autoSendMode === 'backup') await sendBackupMessage(newTokenName, newTokenPhone, tokenCode);
+            else await sendManualApp(newTokenName, newTokenPhone, tokenCode);
+        } else { 
+            loadTokens(); 
+        }
+        setNewTokenName(''); 
+        setNewTokenPhone(''); 
+    } catch (error) { alert('Gagal generate token.'); }
   };
 
-  const loadTokens = async () => { const s = await getDocs(collection(db, 'tokens')); const t = []; s.forEach((d) => t.push(d.data())); t.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); setTokenList(t); };
-  const deleteToken = async (code) => { if(confirm('Hapus?')) { await deleteDoc(doc(db, 'tokens', code)); loadTokens(); }};
-  const deleteAllTokens = async () => { if (!confirm("Hapus SEMUA?")) return; await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); loadTokens(); };
+  const deleteToken = async (code) => { 
+      if(confirm('Hapus token ini?')) { 
+          await deleteDoc(doc(db, 'tokens', code)); 
+          loadTokens(); 
+      }
+  };
+
+  const deleteAllTokens = async () => { 
+      if (!confirm("⚠️ HAPUS SEMUA DATA TOKEN?")) return; 
+      try {
+          await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); 
+          loadTokens(); 
+      } catch (error) { alert("Gagal hapus semua."); }
+  };
+
+  // ==========================================
+  // STATS & LEADERBOARD LOGIC
+  // ==========================================
   
-  // --- VARIABLES FOR DASHBOARD STATS ---
-  const isExpired = (c) => (Date.now() - new Date(c).getTime()) > 24 * 60 * 60 * 1000;
+  const isExpired = (createdAt) => (Date.now() - new Date(createdAt).getTime()) > 24 * 60 * 60 * 1000;
   const activeTokens = tokenList.filter(t => t.status === 'active' && !isExpired(t.createdAt));
   const usedTokens = tokenList.filter(t => t.status === 'used');
   const expiredTokens = tokenList.filter(t => isExpired(t.createdAt));
@@ -169,7 +273,6 @@ const UTBKAdminApp = () => {
       } 
   };
 
-  // --- LEADERBOARD HELPER ---
   const getLeaderboardData = () => {
       const rankedTokens = tokenList.filter(t => t.score !== undefined && t.score !== null);
       rankedTokens.sort((a, b) => {
@@ -180,7 +283,7 @@ const UTBKAdminApp = () => {
   };
 
   const resetLeaderboard = async () => {
-    if (!confirm("⚠️ RESET SKOR SISWA?\nToken tetap aktif, tapi nilai akan jadi 0.")) return;
+    if (!confirm("⚠️ RESET SKOR SISWA?\nToken tetap aktif.")) return;
     try {
         const querySnapshot = await getDocs(collection(db, 'tokens'));
         const updates = [];
@@ -196,7 +299,7 @@ const UTBKAdminApp = () => {
   };
 
   // ==========================================
-  // --- LOGIC BANK SOAL (VERSI LENGKAP - 3 TIPE) ---
+  // BANK SOAL LOGIC (TETAP 3 TIPE)
   // ==========================================
 
   const saveSoal = async (subtestId, questionsData) => { 
@@ -206,9 +309,9 @@ const UTBKAdminApp = () => {
   
   const addOrUpdate = async () => {
     if (!questionText.trim()) { alert('Pertanyaan wajib diisi!'); return; }
-    if (questionType !== 'isian' && options.some(o => !o.trim())) { alert('Semua opsi jawaban A-E wajib diisi!'); return; }
-    if (questionType === 'pilihan_majemuk' && (!Array.isArray(correctAnswer) || correctAnswer.length === 0)) { alert('Pilih minimal 1 kunci jawaban benar!'); return; }
-    if (questionType === 'isian' && (!correctAnswer || correctAnswer.toString().trim() === '')) { alert('Isi kunci jawaban yang benar!'); return; }
+    if (questionType !== 'isian' && options.some(o => !o.trim())) { alert('Semua opsi wajib diisi!'); return; }
+    if (questionType === 'pilihan_majemuk' && (!Array.isArray(correctAnswer) || correctAnswer.length === 0)) { alert('Pilih minimal 1 kunci!'); return; }
+    if (questionType === 'isian' && (!correctAnswer || correctAnswer.toString().trim() === '')) { alert('Isi kunci jawaban!'); return; }
 
     const newQuestion = { 
         id: editingId || Date.now().toString(), 
@@ -220,14 +323,17 @@ const UTBKAdminApp = () => {
     };
 
     const currentQuestions = bankSoal[selectedSubtest] || [];
-    const updatedQuestions = editingId ? currentQuestions.map(q => q.id === editingId ? newQuestion : q) : [...currentQuestions, newQuestion];
+    const updatedQuestions = editingId 
+        ? currentQuestions.map(q => q.id === editingId ? newQuestion : q) 
+        : [...currentQuestions, newQuestion];
+    
     await saveSoal(selectedSubtest, updatedQuestions); 
-    alert('Soal Berhasil Disimpan!'); 
+    alert('Disimpan!'); 
     resetForm();
   };
 
   const deleteSoal = async (id) => { 
-      if(confirm('Apakah Anda yakin ingin menghapus soal ini?')) {
+      if(confirm('Hapus soal ini?')) {
           const currentQuestions = bankSoal[selectedSubtest] || [];
           const filteredQuestions = currentQuestions.filter(x => x.id !== id);
           await saveSoal(selectedSubtest, filteredQuestions); 
@@ -265,7 +371,7 @@ const UTBKAdminApp = () => {
   // --- MODAL LEADERBOARD ---
   const LeaderboardModal = () => (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
               <div className="p-6 border-b flex justify-between items-center bg-indigo-600 rounded-t-2xl text-white">
                   <h2 className="text-xl font-bold flex items-center gap-2"><Trophy size={24} className="text-yellow-300"/> Leaderboard Peserta</h2>
                   <button onClick={()=>setShowLeaderboard(false)} className="hover:bg-indigo-700 p-2 rounded-full transition"><X size={20}/></button>
@@ -298,7 +404,7 @@ const UTBKAdminApp = () => {
                               </tr>
                           ))}
                           {getLeaderboardData().length === 0 && (
-                              <tr><td colSpan="6" className="p-8 text-center text-gray-400 italic">Belum ada data nilai.</td></tr>
+                              <tr><td colSpan="6" className="p-8 text-center text-gray-400 italic">Belum ada data nilai peserta.</td></tr>
                           )}
                       </tbody>
                   </table>
@@ -307,15 +413,18 @@ const UTBKAdminApp = () => {
       </div>
   );
 
-  // --- RENDER HALAMAN LOGIN ---
+  // ==========================================
+  // RENDER UI
+  // ==========================================
+
   if (screen === 'admin_login') {
       return (
           <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100">
               <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
                   <h2 className="text-2xl font-bold mb-6 text-center text-indigo-900">Admin Portal</h2>
                   <form onSubmit={handleLogin} className="space-y-4">
-                      <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring focus:ring-indigo-200 outline-none" placeholder="Email Admin"/>
-                      <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full p-3 border rounded-lg focus:ring focus:ring-indigo-200 outline-none" placeholder="Password"/>
+                      <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full p-3 border rounded-lg" placeholder="Email Admin"/>
+                      <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full p-3 border rounded-lg" placeholder="Password"/>
                       <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition">Masuk Dashboard</button>
                   </form>
               </div>
@@ -323,7 +432,6 @@ const UTBKAdminApp = () => {
       );
   }
 
-  // --- RENDER DASHBOARD UTAMA ---
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {showLeaderboard && <LeaderboardModal />}
@@ -339,25 +447,33 @@ const UTBKAdminApp = () => {
 
       <div className="max-w-7xl mx-auto p-4 flex-1 w-full">
         {viewMode === 'tokens' ? (
-          /* --- UI TOKEN MANAGER (UPDATED WITH STATS GRID) --- */
+          
+          /* --- TOKEN MANAGER UI --- */
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
              
-             {/* PANEL KIRI: BUAT TOKEN */}
+             {/* PANEL KIRI: BUAT TOKEN (3 OPSI) */}
              <div className="md:col-span-1">
                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-24">
                  <h2 className="font-bold text-lg mb-6 flex items-center gap-2 text-gray-800"><Plus size={20} className="text-indigo-600"/> Buat Token Baru</h2>
 
-                 {/* METODE KIRIM (2 OPSI: AUTO & WA ASLI) */}
+                 {/* Metode Kirim (3 OPSI) */}
                  <div className="mb-6">
-                    <p className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider flex items-center gap-1"><Zap size={12}/> Metode Kirim:</p>
+                    <p className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider flex items-center gap-1"><Zap size={12}/> Metode Kirim Default:</p>
                     <div className="flex flex-col gap-3">
-                      <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'fonnte' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                      {/* Opsi 1 */}
+                      <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'fonnte' ? 'border-green-500 bg-green-50 text-green-700 shadow-sm' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
                         <input type="radio" className="hidden" checked={autoSendMode === 'fonnte'} onChange={()=>setAutoSendMode('fonnte')} />
-                        <div className="flex items-center gap-2"><Smartphone size={18}/> <span className="font-bold text-sm">Auto WhatsApp (Fonnte)</span></div>
+                        <div className="flex items-center gap-2"><Zap size={18}/> <span className="font-bold text-sm">1. UTAMA (Fonnte API)</span></div>
                       </label>
-                      <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'js_app' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
-                        <input type="radio" className="hidden" checked={autoSendMode === 'js_app'} onChange={()=>setAutoSendMode('js_app')} />
-                        <div className="flex items-center gap-2"><Smartphone size={18}/> <span className="font-bold text-sm">Manual (WhatsApp App)</span></div>
+                      {/* Opsi 2 */}
+                      <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'backup' ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                        <input type="radio" className="hidden" checked={autoSendMode === 'backup'} onChange={()=>setAutoSendMode('backup')} />
+                        <div className="flex items-center gap-2"><Server size={18}/> <span className="font-bold text-sm">2. CADANGAN (Backup)</span></div>
+                      </label>
+                      {/* Opsi 3 */}
+                      <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'manual' ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                        <input type="radio" className="hidden" checked={autoSendMode === 'manual'} onChange={()=>setAutoSendMode('manual')} />
+                        <div className="flex items-center gap-2"><ExternalLink size={18}/> <span className="font-bold text-sm">3. MANUAL (WA App)</span></div>
                       </label>
                     </div>
                  </div>
@@ -372,44 +488,38 @@ const UTBKAdminApp = () => {
                </div>
              </div>
 
-             {/* PANEL KANAN: DAFTAR TOKEN & STATISTIK */}
+             {/* PANEL KANAN: STATISTIK & TABEL */}
              <div className="md:col-span-2 space-y-6">
                 
-                {/* --- STATISTIK DASHBOARD (SNIPPET 2 INTEGRATED) --- */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <button onClick={() => setFilterStatus('all')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                      <p className="text-xs text-gray-500 uppercase font-bold">Total</p>
-                      <p className="text-2xl font-bold text-gray-800">{tokenList.length}</p>
+                {/* 1. Dashboard Statistik Grid (Auto Filter) */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button onClick={() => setFilterStatus('all')} className={`p-4 rounded-xl border text-center transition shadow-sm ${filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                      <p className="text-xs text-gray-500 uppercase font-bold mb-1">Total</p>
+                      <p className="text-3xl font-bold text-gray-800">{tokenList.length}</p>
                     </button>
-
-                    <button onClick={() => setFilterStatus('active')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'active' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                      <p className="text-xs text-green-600 uppercase font-bold">Aktif</p>
-                      <p className="text-2xl font-bold text-green-700">{activeTokens.length}</p>
+                    <button onClick={() => setFilterStatus('active')} className={`p-4 rounded-xl border text-center transition shadow-sm ${filterStatus === 'active' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                      <p className="text-xs text-green-600 uppercase font-bold mb-1">Aktif</p>
+                      <p className="text-3xl font-bold text-green-700">{activeTokens.length}</p>
                     </button>
-
-                    <button onClick={() => setFilterStatus('used')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'used' ? 'bg-gray-100 border-gray-500 ring-2 ring-gray-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                      <p className="text-xs text-gray-600 uppercase font-bold">Terpakai</p>
-                      <p className="text-2xl font-bold text-gray-700">{usedTokens.length}</p>
+                    <button onClick={() => setFilterStatus('used')} className={`p-4 rounded-xl border text-center transition shadow-sm ${filterStatus === 'used' ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                      <p className="text-xs text-blue-600 uppercase font-bold mb-1">Terpakai</p>
+                      <p className="text-3xl font-bold text-blue-700">{usedTokens.length}</p>
                     </button>
-
-                    <button onClick={() => setFilterStatus('expired')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'expired' ? 'bg-red-50 border-red-500 ring-2 ring-red-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                      <p className="text-xs text-red-600 uppercase font-bold">Expired</p>
-                      <p className="text-2xl font-bold text-red-700">{expiredTokens.length}</p>
+                    <button onClick={() => setFilterStatus('expired')} className={`p-4 rounded-xl border text-center transition shadow-sm ${filterStatus === 'expired' ? 'bg-red-50 border-red-500 ring-2 ring-red-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                      <p className="text-xs text-red-600 uppercase font-bold mb-1">Expired</p>
+                      <p className="text-3xl font-bold text-red-700">{expiredTokens.length}</p>
                     </button>
                 </div>
                 
-                {/* --- TABEL TOKEN --- */}
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 min-h-[500px]">
+                {/* 2. Container Tabel */}
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 min-h-[600px]">
                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                       <div>
                           <h2 className="text-xl font-bold text-gray-800">Daftar Token</h2>
                           <p className="text-sm text-gray-400">Kelola akses ujian siswa</p>
                       </div>
                       <div className="flex gap-2 flex-wrap">
-                        {/* TOMBOL LEADERBOARD */}
-                        <button onClick={()=>setShowLeaderboard(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-white font-bold bg-indigo-600 hover:bg-indigo-700 transition text-xs shadow-md shadow-indigo-200">
-                            <Trophy size={14}/> Lihat Leaderboard
-                        </button>
+                        <button onClick={()=>setShowLeaderboard(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-white font-bold bg-indigo-600 hover:bg-indigo-700 transition text-xs shadow-md shadow-indigo-200"><Trophy size={14}/> Lihat Leaderboard</button>
                         <button onClick={resetLeaderboard} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-orange-600 font-bold bg-orange-50 border border-orange-100 hover:bg-orange-100 transition text-xs"><RefreshCw size={14}/> Reset Score</button>
                         <button onClick={loadTokens} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-indigo-600 font-bold hover:bg-indigo-50 transition text-xs">Refresh</button>
                         <button onClick={deleteAllTokens} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-red-600 font-bold hover:bg-red-50 transition text-xs">Hapus Semua</button>
@@ -423,7 +533,7 @@ const UTBKAdminApp = () => {
                                 <th className="p-4">Kode</th>
                                 <th className="p-4">Nama</th>
                                 <th className="p-4">Status</th>
-                                <th className="p-4">Score</th>
+                                <th className="p-4 text-center">Kirim Ulang</th>
                                 <th className="p-4 text-center">Aksi</th>
                             </tr>
                          </thead>
@@ -431,9 +541,19 @@ const UTBKAdminApp = () => {
                             {getFilteredList().length > 0 ? getFilteredList().map(t => (
                                <tr key={t.tokenCode} className="hover:bg-gray-50 transition">
                                   <td className="p-4 font-mono font-bold text-indigo-600">{t.tokenCode}</td>
-                                  <td className="p-4 font-semibold text-gray-700">{t.studentName}</td>
+                                  <td className="p-4">
+                                      <div className="font-semibold text-gray-700">{t.studentName}</div>
+                                      <div className="text-xs text-gray-400 font-mono mt-0.5">{t.studentPhone}</div>
+                                  </td>
                                   <td className="p-4"><span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${t.status === 'active' ? 'bg-green-100 text-green-700' : t.status === 'used' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>{t.status}</span></td>
-                                  <td className="p-4 font-bold text-gray-600">{t.score !== undefined ? t.score : '-'}</td>
+                                  
+                                  {/* 3 Tombol Aksi Kirim */}
+                                  <td className="p-4 flex gap-2 justify-center">
+                                      <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-green-50 text-green-700 p-2 rounded border border-green-200 hover:bg-green-100 transition" title="Auto (Fonnte)"><Zap size={16}/></button>
+                                      <button onClick={() => sendBackupMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-orange-50 text-orange-700 p-2 rounded border border-orange-200 hover:bg-orange-100 transition" title="Backup"><Server size={16}/></button>
+                                      <button onClick={() => sendManualApp(t.studentName, t.studentPhone, t.tokenCode)} className="bg-blue-50 text-blue-700 p-2 rounded border border-blue-200 hover:bg-blue-100 transition" title="Manual"><ExternalLink size={16}/></button>
+                                  </td>
+
                                   <td className="p-4 text-center">
                                     <button onClick={() => deleteToken(t.tokenCode)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"><Trash2 size={18}/></button>
                                   </td>
@@ -448,7 +568,8 @@ const UTBKAdminApp = () => {
              </div>
           </div>
         ) : (
-          /* --- UI EDITOR SOAL (TETAP SAMA DENGAN 3 TIPE) --- */
+          
+          /* --- UI BANK SOAL (TETAP SAMA 3 TIPE) --- */
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
              <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2></div>
              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
