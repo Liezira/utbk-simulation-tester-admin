@@ -1,40 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Edit, 
-  Plus, 
-  Trash2, 
-  LogOut, 
-  Key, 
-  BarChart3, 
-  Filter, 
-  Copyright, 
-  MessageCircle, 
-  Send, 
-  ExternalLink, 
-  Zap, 
-  Settings, 
-  Radio, 
-  Smartphone, 
-  CheckCircle2, 
-  XCircle, 
-  RefreshCw, 
-  List, 
-  CheckSquare, 
-  Type, 
-  Trophy, 
-  X, 
-  Server // Icon untuk Backup Server
+  Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, 
+  MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
+  CheckCircle2, XCircle, RefreshCw, List, CheckSquare, Type, Trophy, X, Server 
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  collection, 
-  getDocs, 
-  deleteDoc, 
-  deleteField 
+  doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, deleteField 
 } from 'firebase/firestore'; 
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
@@ -88,6 +60,14 @@ const UTBKAdminApp = () => {
   const [options, setOptions] = useState(['', '', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState('A'); 
   const [editingId, setEditingId] = useState(null);
+
+  // REFS
+  const screenRef = useRef(screen);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    screenRef.current = screen;
+  }, [screen]);
 
   // ==========================================
   // INITIAL LOAD & AUTH
@@ -237,7 +217,7 @@ const UTBKAdminApp = () => {
         }
         setNewTokenName(''); 
         setNewTokenPhone(''); 
-    } catch (error) { alert('Gagal generate token.'); }
+    } catch (error) { alert('Gagal generate token. Pastikan Anda sudah Login.'); }
   };
 
   const deleteToken = async (code) => { 
@@ -450,7 +430,7 @@ const UTBKAdminApp = () => {
           
           /* --- TOKEN MANAGER UI --- */
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-             
+              
              {/* PANEL KIRI: BUAT TOKEN (3 OPSI) */}
              <div className="md:col-span-1">
                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-24">
@@ -529,38 +509,38 @@ const UTBKAdminApp = () => {
                    <div className="overflow-hidden rounded-xl border border-gray-100">
                       <table className="w-full text-sm text-left">
                          <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wider font-bold">
-                            <tr>
-                                <th className="p-4">Kode</th>
-                                <th className="p-4">Nama</th>
-                                <th className="p-4">Status</th>
-                                <th className="p-4 text-center">Kirim Ulang</th>
-                                <th className="p-4 text-center">Aksi</th>
-                            </tr>
+                           <tr>
+                               <th className="p-4">Kode</th>
+                               <th className="p-4">Nama</th>
+                               <th className="p-4">Status</th>
+                               <th className="p-4 text-center">Kirim Ulang</th>
+                               <th className="p-4 text-center">Aksi</th>
+                           </tr>
                          </thead>
                          <tbody className="divide-y divide-gray-50">
-                            {getFilteredList().length > 0 ? getFilteredList().map(t => (
-                               <tr key={t.tokenCode} className="hover:bg-gray-50 transition">
-                                  <td className="p-4 font-mono font-bold text-indigo-600">{t.tokenCode}</td>
-                                  <td className="p-4">
-                                      <div className="font-semibold text-gray-700">{t.studentName}</div>
-                                      <div className="text-xs text-gray-400 font-mono mt-0.5">{t.studentPhone}</div>
-                                  </td>
-                                  <td className="p-4"><span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${t.status === 'active' ? 'bg-green-100 text-green-700' : t.status === 'used' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>{t.status}</span></td>
-                                  
-                                  {/* 3 Tombol Aksi Kirim */}
-                                  <td className="p-4 flex gap-2 justify-center">
-                                      <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-green-50 text-green-700 p-2 rounded border border-green-200 hover:bg-green-100 transition" title="Auto (Fonnte)"><Zap size={16}/></button>
-                                      <button onClick={() => sendBackupMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-orange-50 text-orange-700 p-2 rounded border border-orange-200 hover:bg-orange-100 transition" title="Backup"><Server size={16}/></button>
-                                      <button onClick={() => sendManualApp(t.studentName, t.studentPhone, t.tokenCode)} className="bg-blue-50 text-blue-700 p-2 rounded border border-blue-200 hover:bg-blue-100 transition" title="Manual"><ExternalLink size={16}/></button>
-                                  </td>
+                           {getFilteredList().length > 0 ? getFilteredList().map(t => (
+                              <tr key={t.tokenCode} className="hover:bg-gray-50 transition">
+                                 <td className="p-4 font-mono font-bold text-indigo-600">{t.tokenCode}</td>
+                                 <td className="p-4">
+                                     <div className="font-semibold text-gray-700">{t.studentName}</div>
+                                     <div className="text-xs text-gray-400 font-mono mt-0.5">{t.studentPhone}</div>
+                                 </td>
+                                 <td className="p-4"><span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${t.status === 'active' ? 'bg-green-100 text-green-700' : t.status === 'used' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>{t.status}</span></td>
+                                 
+                                 {/* 3 Tombol Aksi Kirim */}
+                                 <td className="p-4 flex gap-2 justify-center">
+                                     <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-green-50 text-green-700 p-2 rounded border border-green-200 hover:bg-green-100 transition" title="Auto (Fonnte)"><Zap size={16}/></button>
+                                     <button onClick={() => sendBackupMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-orange-50 text-orange-700 p-2 rounded border border-orange-200 hover:bg-orange-100 transition" title="Backup"><Server size={16}/></button>
+                                     <button onClick={() => sendManualApp(t.studentName, t.studentPhone, t.tokenCode)} className="bg-blue-50 text-blue-700 p-2 rounded border border-blue-200 hover:bg-blue-100 transition" title="Manual"><ExternalLink size={16}/></button>
+                                 </td>
 
-                                  <td className="p-4 text-center">
-                                    <button onClick={() => deleteToken(t.tokenCode)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"><Trash2 size={18}/></button>
-                                  </td>
-                               </tr>
-                            )) : (
-                                <tr><td colSpan="5" className="p-8 text-center text-gray-400 italic">Tidak ada data token ditemukan.</td></tr>
-                            )}
+                                 <td className="p-4 text-center">
+                                     <button onClick={() => deleteToken(t.tokenCode)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"><Trash2 size={18}/></button>
+                                 </td>
+                              </tr>
+                           )) : (
+                               <tr><td colSpan="5" className="p-8 text-center text-gray-400 italic">Tidak ada data token ditemukan.</td></tr>
+                           )}
                          </tbody>
                       </table>
                    </div>
@@ -585,7 +565,7 @@ const UTBKAdminApp = () => {
                <input value={questionImage} onChange={e => setQuestionImage(e.target.value)} className="w-full p-3 border rounded-lg mb-6 text-sm" placeholder="URL Gambar (Opsional)..." />
                {questionType !== 'isian' ? (<>
                      <div className="space-y-3 mb-6">{options.map((o, i) => (<div key={i} className="flex gap-3 items-center"><span className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-100 font-bold rounded-lg text-indigo-700">{['A','B','C','D','E'][i]}</span><input value={o} onChange={e => {const n=[...options];n[i]=e.target.value;setOptions(n)}} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none" placeholder={`Pilihan Jawaban ${['A','B','C','D','E'][i]}`} /></div>))}</div>
-                     <div className="mb-4"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):</label><div className="flex gap-3">{['A','B','C','D','E'].map(l => {const isSelected = questionType === 'pilihan_ganda' ? correctAnswer === l : correctAnswer.includes(l); return (<button key={l} onClick={() => { if (questionType === 'pilihan_ganda') setCorrectAnswer(l); else toggleMajemukAnswer(l); }} className={`flex-1 py-3 border-2 rounded-lg font-bold transition text-lg ${isSelected ? 'bg-green-500 text-white border-green-500 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>{l}</button>);})}</div></div></>) : (<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200"><label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1"><Key size={14}/> Kunci Jawaban (Teks/Angka):</label><input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)} className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" placeholder="Contoh: 25 atau Jakarta" /><p className="text-xs text-green-600 mt-2 font-medium">*Sistem tidak membedakan huruf besar/kecil (case-insensitive).</p></div>)}
+                     <div className="mb-4"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):</label><div className="flex gap-3">{['A','B','C','D','E'].map(l => {const isSelected = questionType === 'pilihan_ganda' ? correctAnswer === l : correctAnswer.includes(l); return (<button key={l} onClick={() => { if (questionType === 'pilihan_ganda') setCorrectAnswer(l); else toggleMajemukAnswer(l); }} className={`flex-1 py-3 border-2 rounded-lg font-bold transition text-lg ${isSelected ? 'bg-green-50 text-white border-green-500 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>{l}</button>);})}</div></div></>) : (<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200"><label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1"><Key size={14}/> Kunci Jawaban (Teks/Angka):</label><input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)} className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" placeholder="Contoh: 25 atau Jakarta" /><p className="text-xs text-green-600 mt-2 font-medium">*Sistem tidak membedakan huruf besar/kecil (case-insensitive).</p></div>)}
                <div className="flex gap-3 pt-4 border-t border-gray-200"><button onClick={addOrUpdate} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5">{editingId ? 'Simpan Perubahan' : 'Tambah Soal Baru'}</button>{editingId && <button onClick={resetForm} className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100">Batal Edit</button>}</div>
              </div>
              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"><div className="flex-1 pr-4"><div className="flex items-center gap-2 mb-2"><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i+1}</span><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${q.type==='isian'?'bg-green-50 text-green-600 border-green-100':q.type==='pilihan_majemuk'?'bg-orange-50 text-orange-600 border-orange-100':'bg-gray-100 text-gray-500 border-gray-200'}`}>{q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}</span></div><p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p><div className="mt-2 text-xs text-gray-400">Kunci: <span className="font-bold text-gray-600">{Array.isArray(q.correct) ? q.correct.join(', ') : q.correct}</span></div></div><div className="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition"><button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}{(bankSoal[selectedSubtest]||[]).length === 0 && <p className="text-center text-gray-400 py-10 italic border-2 border-dashed rounded-xl">Belum ada soal di subtest ini.</p>}</div>
