@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, 
   MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
-  CheckCircle2, XCircle, RefreshCw, List, CheckSquare, Type, Trophy, X, Server 
+  CheckCircle2, XCircle, RefreshCw, List, CheckSquare, Type, Trophy, X, Server,
+  UploadCloud, Image as ImageIcon, Loader2 // Icon Tambahan untuk Upload
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import { 
@@ -56,7 +57,12 @@ const UTBKAdminApp = () => {
   const [selectedSubtest, setSelectedSubtest] = useState('pu');
   const [questionType, setQuestionType] = useState('pilihan_ganda'); 
   const [questionText, setQuestionText] = useState('');
-  const [questionImage, setQuestionImage] = useState('');
+  
+  // --- STATE KHUSUS UPLOAD ---
+  const [questionImage, setQuestionImage] = useState(''); 
+  const [isUploading, setIsUploading] = useState(false);
+  // ---------------------------
+
   const [options, setOptions] = useState(['', '', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState('A'); 
   const [editingId, setEditingId] = useState(null);
@@ -282,6 +288,32 @@ const UTBKAdminApp = () => {
   // BANK SOAL LOGIC (TETAP 3 TIPE)
   // ==========================================
 
+  // --- FUNGSI BARU: UPLOAD GAMBAR BASE64 ---
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) { 
+        alert("⚠️ File terlalu besar! Maksimal 1MB ya."); 
+        return; 
+    }
+
+    setIsUploading(true);
+    
+    // Teknik Magic: Ubah File jadi String
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        setQuestionImage(reader.result); // Simpan string base64 ke state
+        setIsUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+      setQuestionImage('');
+  };
+  // -----------------------------------------
+
   const saveSoal = async (subtestId, questionsData) => { 
       await setDoc(doc(db, 'bank_soal', subtestId), { questions: questionsData }); 
       setBankSoal(prev => ({ ...prev, [subtestId]: questionsData })); 
@@ -297,7 +329,7 @@ const UTBKAdminApp = () => {
         id: editingId || Date.now().toString(), 
         type: questionType, 
         question: questionText, 
-        image: questionImage, 
+        image: questionImage, // Menggunakan state gambar (Base64)
         options: questionType === 'isian' ? [] : options, 
         correct: correctAnswer 
     };
@@ -549,7 +581,7 @@ const UTBKAdminApp = () => {
           </div>
         ) : (
           
-          /* --- UI BANK SOAL (TETAP SAMA 3 TIPE) --- */
+          /* --- UI BANK SOAL --- */
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
              <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2></div>
              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
@@ -562,13 +594,62 @@ const UTBKAdminApp = () => {
                     <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'isian' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'isian'} onChange={() => handleTypeChange('isian')} /><Type size={18}/> Isian Singkat</label>
                </div></div>
                <textarea value={questionText} onChange={e => setQuestionText(e.target.value)} className="w-full p-4 border rounded-lg mb-4 focus:ring-2 focus:ring-indigo-100 outline-none" rows="3" placeholder="Ketik Pertanyaan di sini (Support LaTeX dengan $...$)..." />
-               <input value={questionImage} onChange={e => setQuestionImage(e.target.value)} className="w-full p-3 border rounded-lg mb-6 text-sm" placeholder="URL Gambar (Opsional)..." />
+               
+               {/* --- INPUT GAMBAR BARU (UPLOAD BASE64) --- */}
+               <div className="mb-6">
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Gambar Soal (Opsional):</label>
+                  
+                  {!questionImage ? (
+                      // TAMPILAN BELUM ADA GAMBAR -> TOMBOL UPLOAD
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition cursor-pointer relative">
+                          <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={handleImageUpload} 
+                              disabled={isUploading}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                          {isUploading ? (
+                              <div className="flex flex-col items-center text-indigo-600 animate-pulse">
+                                  <Loader2 size={32} className="animate-spin mb-2"/>
+                                  <span className="text-sm font-bold">Sedang Memproses...</span>
+                              </div>
+                          ) : (
+                              <div className="flex flex-col items-center text-gray-400">
+                                  <UploadCloud size={32} className="mb-2"/>
+                                  <span className="text-sm font-medium text-gray-500">Klik untuk Upload Gambar</span>
+                                  <span className="text-xs text-gray-400 mt-1">Max 1MB (Langsung Simpan)</span>
+                              </div>
+                          )}
+                      </div>
+                  ) : (
+                      // TAMPILAN SUDAH ADA GAMBAR -> PREVIEW & HAPUS
+                      <div className="relative w-fit group">
+                          <img src={questionImage} alt="Preview Soal" className="max-h-48 rounded-lg border border-gray-200 shadow-sm" />
+                          <button 
+                              onClick={removeImage}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition transform hover:scale-110"
+                              title="Hapus Gambar"
+                          >
+                              <X size={16} />
+                          </button>
+                          <div className="mt-2 text-xs text-green-600 font-bold flex items-center gap-1">
+                              <CheckCircle2 size={12}/> Gambar Siap Disimpan
+                          </div>
+                      </div>
+                  )}
+               </div>
+
+               {/* OPSI JAWABAN */}
                {questionType !== 'isian' ? (<>
                      <div className="space-y-3 mb-6">{options.map((o, i) => (<div key={i} className="flex gap-3 items-center"><span className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-100 font-bold rounded-lg text-indigo-700">{['A','B','C','D','E'][i]}</span><input value={o} onChange={e => {const n=[...options];n[i]=e.target.value;setOptions(n)}} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none" placeholder={`Pilihan Jawaban ${['A','B','C','D','E'][i]}`} /></div>))}</div>
-                     <div className="mb-4"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):</label><div className="flex gap-3">{['A','B','C','D','E'].map(l => {const isSelected = questionType === 'pilihan_ganda' ? correctAnswer === l : correctAnswer.includes(l); return (<button key={l} onClick={() => { if (questionType === 'pilihan_ganda') setCorrectAnswer(l); else toggleMajemukAnswer(l); }} className={`flex-1 py-3 border-2 rounded-lg font-bold transition text-lg ${isSelected ? 'bg-green-50 text-white border-green-500 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>{l}</button>);})}</div></div></>) : (<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200"><label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1"><Key size={14}/> Kunci Jawaban (Teks/Angka):</label><input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)} className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" placeholder="Contoh: 25 atau Jakarta" /><p className="text-xs text-green-600 mt-2 font-medium">*Sistem tidak membedakan huruf besar/kecil (case-insensitive).</p></div>)}
+                     <div className="mb-4"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):</label><div className="flex gap-3">{['A','B','C','D','E'].map(l => {const isSelected = questionType === 'pilihan_ganda' ? correctAnswer === l : correctAnswer.includes(l); return (<button key={l} onClick={() => { if (questionType === 'pilihan_ganda') setCorrectAnswer(l); else toggleMajemukAnswer(l); }} className={`flex-1 py-3 border-2 rounded-lg font-bold transition text-lg ${isSelected ? 'bg-green-50 text-white border-green-500 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>{l}</button>);})}</div></div></>) : (<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200"><label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1"><Key size={14}/> Kunci Jawaban (Teks/Angka):</label><input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)} className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" placeholder="Contoh: 25 atau Jakarta" /></div>)}
+               
                <div className="flex gap-3 pt-4 border-t border-gray-200"><button onClick={addOrUpdate} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5">{editingId ? 'Simpan Perubahan' : 'Tambah Soal Baru'}</button>{editingId && <button onClick={resetForm} className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100">Batal Edit</button>}</div>
              </div>
-             <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"><div className="flex-1 pr-4"><div className="flex items-center gap-2 mb-2"><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i+1}</span><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${q.type==='isian'?'bg-green-50 text-green-600 border-green-100':q.type==='pilihan_majemuk'?'bg-orange-50 text-orange-600 border-orange-100':'bg-gray-100 text-gray-500 border-gray-200'}`}>{q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}</span></div><p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p><div className="mt-2 text-xs text-gray-400">Kunci: <span className="font-bold text-gray-600">{Array.isArray(q.correct) ? q.correct.join(', ') : q.correct}</span></div></div><div className="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition"><button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}{(bankSoal[selectedSubtest]||[]).length === 0 && <p className="text-center text-gray-400 py-10 italic border-2 border-dashed rounded-xl">Belum ada soal di subtest ini.</p>}</div>
+             
+             {/* LIST SOAL */}
+             <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"><div className="flex-1 pr-4"><div className="flex items-center gap-2 mb-2"><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i+1}</span><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${q.type==='isian'?'bg-green-50 text-green-600 border-green-100':q.type==='pilihan_majemuk'?'bg-orange-50 text-orange-600 border-orange-100':'bg-gray-100 text-gray-500 border-gray-200'}`}>{q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}</span></div><p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p>{q.image && <div className="mt-2 text-xs text-blue-500 flex items-center gap-1"><ImageIcon size={12}/> Ada Gambar</div>}</div><div className="flex gap-2"><button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
           </div>
         )}
       </div>
