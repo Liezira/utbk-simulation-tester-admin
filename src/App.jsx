@@ -520,10 +520,19 @@ const UTBKAdminApp = () => {
                                  </td>
                                  <td className="p-4"><span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${t.status === 'active' ? 'bg-green-100 text-green-700' : t.status === 'used' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>{t.status}</span></td>
                                  
-                                 <td className="p-4 flex gap-2 justify-center">
-                                     <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-green-50 text-green-700 p-2 rounded border border-green-200 hover:bg-green-100 transition" title="Auto (Fonnte)"><Zap size={16}/></button>
-                                     <button onClick={() => sendBackupMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-orange-50 text-orange-700 p-2 rounded border border-orange-200 hover:bg-orange-100 transition" title="Backup"><Server size={16}/></button>
-                                     <button onClick={() => sendManualApp(t.studentName, t.studentPhone, t.tokenCode)} className="bg-blue-50 text-blue-700 p-2 rounded border border-blue-200 hover:bg-blue-100 transition" title="Manual"><ExternalLink size={16}/></button>
+                                 <td className="p-4 text-center">
+                                     <div className="mb-2 text-[10px] font-bold uppercase tracking-wide">
+                                        {t.isSent ? (
+                                            <span className="text-green-600 bg-green-50 px-2 py-1 rounded border border-green-100">✅ via {t.sentMethod}</span>
+                                        ) : (
+                                            <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100">Belum Dikirim</span>
+                                        )}
+                                     </div>
+                                     <div className="flex gap-2 justify-center">
+                                        <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-green-50 text-green-700 p-2 rounded border border-green-200 hover:bg-green-100 transition" title="Auto (Fonnte)"><Zap size={16}/></button>
+                                        <button onClick={() => sendBackupMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-orange-50 text-orange-700 p-2 rounded border border-orange-200 hover:bg-orange-100 transition" title="Backup"><Server size={16}/></button>
+                                        <button onClick={() => sendManualApp(t.studentName, t.studentPhone, t.tokenCode)} className="bg-blue-50 text-blue-700 p-2 rounded border border-blue-200 hover:bg-blue-100 transition" title="Manual"><ExternalLink size={16}/></button>
+                                     </div>
                                  </td>
 
                                  <td className="p-4 text-center">
