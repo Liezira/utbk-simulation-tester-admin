@@ -22,6 +22,8 @@ const SUBTESTS = [
 ];
 
 const STUDENT_APP_URL = "https://utbk-simulation-tester-student.vercel.app"; 
+const FEEDBACK_URL = "https://forms.gle/NDsPSD5vCz3TSbRd8"; 
+
 const FONNTE_TOKEN = import.meta.env.VITE_FONNTE_TOKEN; 
 const BACKUP_TOKEN = import.meta.env.VITE_BACKUP_TOKEN; 
 const BACKUP_URL = import.meta.env.VITE_BACKUP_URL; 
@@ -132,7 +134,7 @@ const UTBKAdminApp = () => {
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
     
-    const message = `Halo *${name}*,\n\nBerikut akses ujian simulasi kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\nSelamat mengerjakan!`;
+    const message = `Halo *${name}*,\n\nBerikut akses ujian simulasi kamu:\n🔑 Token: *${token}*\n🔗 Link Ujian: ${STUDENT_APP_URL}\n\n📝 *Wajib isi Feedback setelah ujian:*\n${FEEDBACK_URL}\n\nSelamat mengerjakan!`;
     
     try {
         const params = new URLSearchParams({ token: FONNTE_TOKEN, target: formattedPhone, message: message, delay: SEND_DELAY, countryCode: '62' });
@@ -150,7 +152,7 @@ const UTBKAdminApp = () => {
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
 
-    const message = `Halo *${name}*,\n\nBerikut akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\nSelamat mengerjakan!`;
+    const message = `Halo *${name}*,\n\nBerikut akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n📝 Feedback: ${FEEDBACK_URL}\n\nSelamat mengerjakan!`;
 
     try {
         const params = new URLSearchParams({ token: BACKUP_TOKEN, number: formattedPhone, message: message });
@@ -165,7 +167,7 @@ const UTBKAdminApp = () => {
       let p = phone.replace(/\D/g, ''); 
       if (p.startsWith('0')) p = '62' + p.slice(1); 
       
-      const text = `Halo *${name}*, Token: *${token}*, Link: ${STUDENT_APP_URL}`;
+      const text = `Halo *${name}*, Token: *${token}*, Link: ${STUDENT_APP_URL}\n\nMohon isi feedback setelah selesai: ${FEEDBACK_URL}`;
       window.open(`https://api.whatsapp.com/send?phone=${p}&text=${encodeURIComponent(text)}`, '_blank'); 
       
       await markAsSent(token, 'Manual App'); 
