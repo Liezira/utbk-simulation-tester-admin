@@ -3,7 +3,7 @@ import {
   Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, 
   MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
   CheckCircle2, XCircle, RefreshCw, List, CheckSquare, Type, Trophy, X, Server,
-  UploadCloud, Image as ImageIcon, Loader2 // Icon Tambahan untuk Upload
+  UploadCloud, Image as ImageIcon, Loader2, School
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import { 
@@ -11,9 +11,6 @@ import {
 } from 'firebase/firestore'; 
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
-// ==========================================
-// KONFIGURASI CONSTANT
-// ==========================================
 const SUBTESTS = [
   { id: 'pu', name: 'Penalaran Umum', questions: 30 },
   { id: 'ppu', name: 'Pengetahuan & Pemahaman Umum', questions: 20 },
@@ -31,43 +28,34 @@ const BACKUP_URL = import.meta.env.VITE_BACKUP_URL;
 const SEND_DELAY = 3; 
 
 const UTBKAdminApp = () => {
-  // ==========================================
-  // STATE MANAGEMENT
-  // ==========================================
   const [screen, setScreen] = useState('admin_login'); 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [viewMode, setViewMode] = useState('tokens'); 
   
-  // Data Lists
   const [tokenList, setTokenList] = useState([]);
   const [bankSoal, setBankSoal] = useState({});
   const [filterStatus, setFilterStatus] = useState('all');
   
-  // Create Token State
   const [newTokenName, setNewTokenName] = useState('');
   const [newTokenPhone, setNewTokenPhone] = useState('');
+  const [newTokenSchool, setNewTokenSchool] = useState('');
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
   const [isSending, setIsSending] = useState(false);
 
-  // Leaderboard Modal State
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  // Editor Soal State
   const [selectedSubtest, setSelectedSubtest] = useState('pu');
   const [questionType, setQuestionType] = useState('pilihan_ganda'); 
   const [questionText, setQuestionText] = useState('');
   
-  // --- STATE KHUSUS UPLOAD ---
   const [questionImage, setQuestionImage] = useState(''); 
   const [isUploading, setIsUploading] = useState(false);
-  // ---------------------------
 
   const [options, setOptions] = useState(['', '', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState('A'); 
   const [editingId, setEditingId] = useState(null);
 
-  // REFS
   const screenRef = useRef(screen);
   const timerRef = useRef(null);
 
@@ -75,9 +63,6 @@ const UTBKAdminApp = () => {
     screenRef.current = screen;
   }, [screen]);
 
-  // ==========================================
-  // INITIAL LOAD & AUTH
-  // ==========================================
   useEffect(() => {
     const loadBankSoal = async () => {
       const loaded = {};
@@ -118,10 +103,6 @@ const UTBKAdminApp = () => {
       setScreen('admin_login'); 
   };
 
-  // ==========================================
-  // LOGIC TOKEN & SENDING (3 METHODS)
-  // ==========================================
-
   const loadTokens = async () => { 
       const s = await getDocs(collection(db, 'tokens')); 
       const t = []; 
@@ -144,7 +125,6 @@ const UTBKAdminApp = () => {
       } 
   };
   
-  // 1. ENGINE UTAMA (FONNTE)
   const sendFonnteMessage = async (name, phone, token) => {
     if (!FONNTE_TOKEN) { alert("Token Fonnte Kosong!"); return; }
     setIsSending(true);
@@ -163,7 +143,6 @@ const UTBKAdminApp = () => {
     finally { setIsSending(false); }
   };
 
-  // 2. ENGINE CADANGAN (BACKUP)
   const sendBackupMessage = async (name, phone, token) => {
     if (!BACKUP_TOKEN) { alert("Token Backup Kosong!"); return; }
     setIsSending(true);
@@ -182,7 +161,6 @@ const UTBKAdminApp = () => {
     finally { setIsSending(false); }
   };
 
-  // 3. ENGINE MANUAL (WA APP)
   const sendManualApp = async (name, phone, token) => { 
       let p = phone.replace(/\D/g, ''); 
       if (p.startsWith('0')) p = '62' + p.slice(1); 
@@ -194,7 +172,7 @@ const UTBKAdminApp = () => {
   };
 
   const createToken = async () => {
-    if (!newTokenName || !newTokenPhone) { alert('Isi data!'); return; }
+    if (!newTokenName || !newTokenPhone || !newTokenSchool) { alert('Isi Nama, No WA, dan Asal Sekolah!'); return; }
     
     const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     
@@ -203,6 +181,7 @@ const UTBKAdminApp = () => {
             tokenCode, 
             studentName: newTokenName, 
             studentPhone: newTokenPhone, 
+            studentSchool: newTokenSchool,
             status: 'active', 
             createdAt: new Date().toISOString(), 
             isSent: false, 
@@ -223,6 +202,7 @@ const UTBKAdminApp = () => {
         }
         setNewTokenName(''); 
         setNewTokenPhone(''); 
+        setNewTokenSchool('');
     } catch (error) { alert('Gagal generate token. Pastikan Anda sudah Login.'); }
   };
 
@@ -241,10 +221,6 @@ const UTBKAdminApp = () => {
       } catch (error) { alert("Gagal hapus semua."); }
   };
 
-  // ==========================================
-  // STATS & LEADERBOARD LOGIC
-  // ==========================================
-  
   const isExpired = (createdAt) => (Date.now() - new Date(createdAt).getTime()) > 24 * 60 * 60 * 1000;
   const activeTokens = tokenList.filter(t => t.status === 'active' && !isExpired(t.createdAt));
   const usedTokens = tokenList.filter(t => t.status === 'used');
@@ -284,11 +260,6 @@ const UTBKAdminApp = () => {
     } catch (error) { alert("Gagal reset."); }
   };
 
-  // ==========================================
-  // BANK SOAL LOGIC (TETAP 3 TIPE)
-  // ==========================================
-
-  // --- FUNGSI BARU: UPLOAD GAMBAR BASE64 ---
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -300,10 +271,9 @@ const UTBKAdminApp = () => {
 
     setIsUploading(true);
     
-    // Teknik Magic: Ubah File jadi String
     const reader = new FileReader();
     reader.onloadend = () => {
-        setQuestionImage(reader.result); // Simpan string base64 ke state
+        setQuestionImage(reader.result); 
         setIsUploading(false);
     };
     reader.readAsDataURL(file);
@@ -312,7 +282,6 @@ const UTBKAdminApp = () => {
   const removeImage = () => {
       setQuestionImage('');
   };
-  // -----------------------------------------
 
   const saveSoal = async (subtestId, questionsData) => { 
       await setDoc(doc(db, 'bank_soal', subtestId), { questions: questionsData }); 
@@ -329,7 +298,7 @@ const UTBKAdminApp = () => {
         id: editingId || Date.now().toString(), 
         type: questionType, 
         question: questionText, 
-        image: questionImage, // Menggunakan state gambar (Base64)
+        image: questionImage, 
         options: questionType === 'isian' ? [] : options, 
         correct: correctAnswer 
     };
@@ -380,7 +349,6 @@ const UTBKAdminApp = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- MODAL LEADERBOARD ---
   const LeaderboardModal = () => (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
@@ -394,6 +362,7 @@ const UTBKAdminApp = () => {
                           <tr>
                               <th className="p-3 text-center">#</th>
                               <th className="p-3">Nama Siswa</th>
+                              <th className="p-3">Asal Sekolah</th>
                               <th className="p-3">Kode Token</th>
                               <th className="p-3">No. WhatsApp</th>
                               <th className="p-3 text-center">Score</th>
@@ -407,6 +376,7 @@ const UTBKAdminApp = () => {
                                       {idx===0 ? '🥇' : idx===1 ? '🥈' : idx===2 ? '🥉' : idx+1}
                                   </td>
                                   <td className="p-3 font-medium text-gray-800">{t.studentName}</td>
+                                  <td className="p-3 text-gray-600">{t.studentSchool || '-'}</td>
                                   <td className="p-3 font-mono text-indigo-600 font-bold">{t.tokenCode}</td>
                                   <td className="p-3 font-mono text-gray-600">{t.studentPhone}</td>
                                   <td className="p-3 text-center font-bold text-indigo-600 text-lg">{t.score}</td>
@@ -416,7 +386,7 @@ const UTBKAdminApp = () => {
                               </tr>
                           ))}
                           {getLeaderboardData().length === 0 && (
-                              <tr><td colSpan="6" className="p-8 text-center text-gray-400 italic">Belum ada data nilai peserta.</td></tr>
+                              <tr><td colSpan="7" className="p-8 text-center text-gray-400 italic">Belum ada data nilai peserta.</td></tr>
                           )}
                       </tbody>
                   </table>
@@ -424,10 +394,6 @@ const UTBKAdminApp = () => {
           </div>
       </div>
   );
-
-  // ==========================================
-  // RENDER UI
-  // ==========================================
 
   if (screen === 'admin_login') {
       return (
@@ -460,29 +426,23 @@ const UTBKAdminApp = () => {
       <div className="max-w-7xl mx-auto p-4 flex-1 w-full">
         {viewMode === 'tokens' ? (
           
-          /* --- TOKEN MANAGER UI --- */
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               
-             {/* PANEL KIRI: BUAT TOKEN (3 OPSI) */}
              <div className="md:col-span-1">
                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-24">
                  <h2 className="font-bold text-lg mb-6 flex items-center gap-2 text-gray-800"><Plus size={20} className="text-indigo-600"/> Buat Token Baru</h2>
 
-                 {/* Metode Kirim (3 OPSI) */}
                  <div className="mb-6">
                     <p className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider flex items-center gap-1"><Zap size={12}/> Metode Kirim Default:</p>
                     <div className="flex flex-col gap-3">
-                      {/* Opsi 1 */}
                       <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'fonnte' ? 'border-green-500 bg-green-50 text-green-700 shadow-sm' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
                         <input type="radio" className="hidden" checked={autoSendMode === 'fonnte'} onChange={()=>setAutoSendMode('fonnte')} />
                         <div className="flex items-center gap-2"><Zap size={18}/> <span className="font-bold text-sm">1. UTAMA (Fonnte API)</span></div>
                       </label>
-                      {/* Opsi 2 */}
                       <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'backup' ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
                         <input type="radio" className="hidden" checked={autoSendMode === 'backup'} onChange={()=>setAutoSendMode('backup')} />
                         <div className="flex items-center gap-2"><Server size={18}/> <span className="font-bold text-sm">2. CADANGAN (Backup)</span></div>
                       </label>
-                      {/* Opsi 3 */}
                       <label className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${autoSendMode === 'manual' ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
                         <input type="radio" className="hidden" checked={autoSendMode === 'manual'} onChange={()=>setAutoSendMode('manual')} />
                         <div className="flex items-center gap-2"><ExternalLink size={18}/> <span className="font-bold text-sm">3. MANUAL (WA App)</span></div>
@@ -492,6 +452,7 @@ const UTBKAdminApp = () => {
 
                  <div className="space-y-4">
                     <input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" placeholder="Nama Siswa"/>
+                    <input value={newTokenSchool} onChange={e=>setNewTokenSchool(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" placeholder="Asal Sekolah"/>
                     <input value={newTokenPhone} onChange={e=>setNewTokenPhone(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" placeholder="No WhatsApp (08xxx)"/>
                     <button onClick={createToken} disabled={isSending} className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-transform transform active:scale-95 flex justify-center items-center gap-2 ${isSending ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
                       {isSending ? 'Mengirim...' : 'Generate & Kirim'} <Send size={16}/>
@@ -500,10 +461,8 @@ const UTBKAdminApp = () => {
                </div>
              </div>
 
-             {/* PANEL KANAN: STATISTIK & TABEL */}
              <div className="md:col-span-2 space-y-6">
                 
-                {/* 1. Dashboard Statistik Grid (Auto Filter) */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <button onClick={() => setFilterStatus('all')} className={`p-4 rounded-xl border text-center transition shadow-sm ${filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                       <p className="text-xs text-gray-500 uppercase font-bold mb-1">Total</p>
@@ -523,7 +482,6 @@ const UTBKAdminApp = () => {
                     </button>
                 </div>
                 
-                {/* 2. Container Tabel */}
                 <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 min-h-[600px]">
                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                       <div>
@@ -555,11 +513,11 @@ const UTBKAdminApp = () => {
                                  <td className="p-4 font-mono font-bold text-indigo-600">{t.tokenCode}</td>
                                  <td className="p-4">
                                      <div className="font-semibold text-gray-700">{t.studentName}</div>
+                                     <div className="text-xs font-bold text-indigo-500 flex items-center gap-1 mt-0.5"><School size={10}/> {t.studentSchool || '-'}</div>
                                      <div className="text-xs text-gray-400 font-mono mt-0.5">{t.studentPhone}</div>
                                  </td>
                                  <td className="p-4"><span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${t.status === 'active' ? 'bg-green-100 text-green-700' : t.status === 'used' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>{t.status}</span></td>
                                  
-                                 {/* 3 Tombol Aksi Kirim */}
                                  <td className="p-4 flex gap-2 justify-center">
                                      <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-green-50 text-green-700 p-2 rounded border border-green-200 hover:bg-green-100 transition" title="Auto (Fonnte)"><Zap size={16}/></button>
                                      <button onClick={() => sendBackupMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-orange-50 text-orange-700 p-2 rounded border border-orange-200 hover:bg-orange-100 transition" title="Backup"><Server size={16}/></button>
@@ -581,7 +539,6 @@ const UTBKAdminApp = () => {
           </div>
         ) : (
           
-          /* --- UI BANK SOAL --- */
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
              <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2></div>
              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
@@ -595,12 +552,10 @@ const UTBKAdminApp = () => {
                </div></div>
                <textarea value={questionText} onChange={e => setQuestionText(e.target.value)} className="w-full p-4 border rounded-lg mb-4 focus:ring-2 focus:ring-indigo-100 outline-none" rows="3" placeholder="Ketik Pertanyaan di sini (Support LaTeX dengan $...$)..." />
                
-               {/* --- INPUT GAMBAR BARU (UPLOAD BASE64) --- */}
                <div className="mb-6">
                   <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Gambar Soal (Opsional):</label>
                   
                   {!questionImage ? (
-                      // TAMPILAN BELUM ADA GAMBAR -> TOMBOL UPLOAD
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition cursor-pointer relative">
                           <input 
                               type="file" 
@@ -623,7 +578,6 @@ const UTBKAdminApp = () => {
                           )}
                       </div>
                   ) : (
-                      // TAMPILAN SUDAH ADA GAMBAR -> PREVIEW & HAPUS
                       <div className="relative w-fit group">
                           <img src={questionImage} alt="Preview Soal" className="max-h-48 rounded-lg border border-gray-200 shadow-sm" />
                           <button 
@@ -640,7 +594,6 @@ const UTBKAdminApp = () => {
                   )}
                </div>
 
-               {/* OPSI JAWABAN */}
                {questionType !== 'isian' ? (<>
                      <div className="space-y-3 mb-6">{options.map((o, i) => (<div key={i} className="flex gap-3 items-center"><span className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-100 font-bold rounded-lg text-indigo-700">{['A','B','C','D','E'][i]}</span><input value={o} onChange={e => {const n=[...options];n[i]=e.target.value;setOptions(n)}} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none" placeholder={`Pilihan Jawaban ${['A','B','C','D','E'][i]}`} /></div>))}</div>
                      <div className="mb-4"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):</label><div className="flex gap-3">{['A','B','C','D','E'].map(l => {const isSelected = questionType === 'pilihan_ganda' ? correctAnswer === l : correctAnswer.includes(l); return (<button key={l} onClick={() => { if (questionType === 'pilihan_ganda') setCorrectAnswer(l); else toggleMajemukAnswer(l); }} className={`flex-1 py-3 border-2 rounded-lg font-bold transition text-lg ${isSelected ? 'bg-green-50 text-white border-green-500 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>{l}</button>);})}</div></div></>) : (<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200"><label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1"><Key size={14}/> Kunci Jawaban (Teks/Angka):</label><input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)} className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" placeholder="Contoh: 25 atau Jakarta" /></div>)}
@@ -648,7 +601,6 @@ const UTBKAdminApp = () => {
                <div className="flex gap-3 pt-4 border-t border-gray-200"><button onClick={addOrUpdate} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5">{editingId ? 'Simpan Perubahan' : 'Tambah Soal Baru'}</button>{editingId && <button onClick={resetForm} className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100">Batal Edit</button>}</div>
              </div>
              
-             {/* LIST SOAL */}
              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"><div className="flex-1 pr-4"><div className="flex items-center gap-2 mb-2"><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i+1}</span><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${q.type==='isian'?'bg-green-50 text-green-600 border-green-100':q.type==='pilihan_majemuk'?'bg-orange-50 text-orange-600 border-orange-100':'bg-gray-100 text-gray-500 border-gray-200'}`}>{q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}</span></div><p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p>{q.image && <div className="mt-2 text-xs text-blue-500 flex items-center gap-1"><ImageIcon size={12}/> Ada Gambar</div>}</div><div className="flex gap-2"><button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
           </div>
         )}
