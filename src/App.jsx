@@ -3,13 +3,15 @@ import {
   Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, 
   MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
   CheckCircle2, XCircle, RefreshCw, List, CheckSquare, Type, Trophy, X, Server,
-  UploadCloud, Image as ImageIcon, Loader2, School
+  UploadCloud, Image as ImageIcon, Loader2, School, Eye
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import { 
   doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, deleteField 
 } from 'firebase/firestore'; 
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import 'katex/dist/katex.min.css';
+import Latex from 'react-latex-next';
 
 const SUBTESTS = [
   { id: 'pu', name: 'Penalaran Umum', questions: 30 },
@@ -550,69 +552,122 @@ const UTBKAdminApp = () => {
           </div>
         ) : (
           
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-             <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2></div>
-             <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
-               <select value={selectedSubtest} onChange={e => { setSelectedSubtest(e.target.value); resetForm(); }} className="w-full p-3 border rounded-lg mb-6 bg-white font-medium text-gray-700 shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none">
-                   {SUBTESTS.map(s => (<option key={s.id} value={s.id}>{s.name} ({bankSoal[s.id]?.length || 0} / {s.questions})</option>))}
-               </select>
-               <div className="mb-6"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Format Soal:</label><div className="flex flex-wrap gap-2">
-                    <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'pilihan_ganda' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'pilihan_ganda'} onChange={() => handleTypeChange('pilihan_ganda')} /><List size={18}/> Pilihan Ganda</label>
-                    <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'pilihan_majemuk' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'pilihan_majemuk'} onChange={() => handleTypeChange('pilihan_majemuk')} /><CheckSquare size={18}/> Pilihan Majemuk</label>
-                    <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'isian' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'isian'} onChange={() => handleTypeChange('isian')} /><Type size={18}/> Isian Singkat</label>
-               </div></div>
-               <textarea value={questionText} onChange={e => setQuestionText(e.target.value)} className="w-full p-4 border rounded-lg mb-4 focus:ring-2 focus:ring-indigo-100 outline-none" rows="3" placeholder="Ketik Pertanyaan di sini (Support LaTeX dengan $...$)..." />
-               
-               <div className="mb-6">
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Gambar Soal (Opsional):</label>
-                  
-                  {!questionImage ? (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition cursor-pointer relative">
-                          <input 
-                              type="file" 
-                              accept="image/*" 
-                              onChange={handleImageUpload} 
-                              disabled={isUploading}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          />
-                          {isUploading ? (
-                              <div className="flex flex-col items-center text-indigo-600 animate-pulse">
-                                  <Loader2 size={32} className="animate-spin mb-2"/>
-                                  <span className="text-sm font-bold">Sedang Memproses...</span>
-                              </div>
-                          ) : (
-                              <div className="flex flex-col items-center text-gray-400">
-                                  <UploadCloud size={32} className="mb-2"/>
-                                  <span className="text-sm font-medium text-gray-500">Klik untuk Upload Gambar</span>
-                                  <span className="text-xs text-gray-400 mt-1">Max 1MB (Langsung Simpan)</span>
-                              </div>
-                          )}
-                      </div>
-                  ) : (
-                      <div className="relative w-fit group">
-                          <img src={questionImage} alt="Preview Soal" className="max-h-48 rounded-lg border border-gray-200 shadow-sm" />
-                          <button 
-                              onClick={removeImage}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition transform hover:scale-110"
-                              title="Hapus Gambar"
-                          >
-                              <X size={16} />
-                          </button>
-                          <div className="mt-2 text-xs text-green-600 font-bold flex items-center gap-1">
-                              <CheckCircle2 size={12}/> Gambar Siap Disimpan
-                          </div>
-                      </div>
-                  )}
-               </div>
-
-               {questionType !== 'isian' ? (<>
-                     <div className="space-y-3 mb-6">{options.map((o, i) => (<div key={i} className="flex gap-3 items-center"><span className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-100 font-bold rounded-lg text-indigo-700">{['A','B','C','D','E'][i]}</span><input value={o} onChange={e => {const n=[...options];n[i]=e.target.value;setOptions(n)}} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none" placeholder={`Pilihan Jawaban ${['A','B','C','D','E'][i]}`} /></div>))}</div>
-                     <div className="mb-4"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):</label><div className="flex gap-3">{['A','B','C','D','E'].map(l => {const isSelected = questionType === 'pilihan_ganda' ? correctAnswer === l : correctAnswer.includes(l); return (<button key={l} onClick={() => { if (questionType === 'pilihan_ganda') setCorrectAnswer(l); else toggleMajemukAnswer(l); }} className={`flex-1 py-3 border-2 rounded-lg font-bold transition text-lg ${isSelected ? 'bg-green-50 text-white border-green-500 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>{l}</button>);})}</div></div></>) : (<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200"><label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1"><Key size={14}/> Kunci Jawaban (Teks/Angka):</label><input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)} className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" placeholder="Contoh: 25 atau Jakarta" /></div>)}
-               
-               <div className="flex gap-3 pt-4 border-t border-gray-200"><button onClick={addOrUpdate} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5">{editingId ? 'Simpan Perubahan' : 'Tambah Soal Baru'}</button>{editingId && <button onClick={resetForm} className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100">Batal Edit</button>}</div>
-             </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
              
-             <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"><div className="flex-1 pr-4"><div className="flex items-center gap-2 mb-2"><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i+1}</span><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${q.type==='isian'?'bg-green-50 text-green-600 border-green-100':q.type==='pilihan_majemuk'?'bg-orange-50 text-orange-600 border-orange-100':'bg-gray-100 text-gray-500 border-gray-200'}`}>{q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}</span></div><p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p>{q.image && <div className="mt-2 text-xs text-blue-500 flex items-center gap-1"><ImageIcon size={12}/> Ada Gambar</div>}</div><div className="flex gap-2"><button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
+             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+               <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2></div>
+               <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
+                 <select value={selectedSubtest} onChange={e => { setSelectedSubtest(e.target.value); resetForm(); }} className="w-full p-3 border rounded-lg mb-6 bg-white font-medium text-gray-700 shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none">
+                     {SUBTESTS.map(s => (<option key={s.id} value={s.id}>{s.name} ({bankSoal[s.id]?.length || 0} / {s.questions})</option>))}
+                 </select>
+                 <div className="mb-6"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Format Soal:</label><div className="flex flex-wrap gap-2">
+                      <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'pilihan_ganda' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'pilihan_ganda'} onChange={() => handleTypeChange('pilihan_ganda')} /><List size={18}/> Pilihan Ganda</label>
+                      <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'pilihan_majemuk' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'pilihan_majemuk'} onChange={() => handleTypeChange('pilihan_majemuk')} /><CheckSquare size={18}/> Pilihan Majemuk</label>
+                      <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'isian' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'isian'} onChange={() => handleTypeChange('isian')} /><Type size={18}/> Isian Singkat</label>
+                 </div></div>
+                 <textarea value={questionText} onChange={e => setQuestionText(e.target.value)} className="w-full p-4 border rounded-lg mb-4 focus:ring-2 focus:ring-indigo-100 outline-none" rows="3" placeholder="Ketik Pertanyaan di sini (Support LaTeX dengan $...$)..." />
+                 
+                 <div className="mb-6">
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Gambar Soal (Opsional):</label>
+                    
+                    {!questionImage ? (
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition cursor-pointer relative">
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                onChange={handleImageUpload} 
+                                disabled={isUploading}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
+                            {isUploading ? (
+                                <div className="flex flex-col items-center text-indigo-600 animate-pulse">
+                                    <Loader2 size={32} className="animate-spin mb-2"/>
+                                    <span className="text-sm font-bold">Sedang Memproses...</span>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center text-gray-400">
+                                    <UploadCloud size={32} className="mb-2"/>
+                                    <span className="text-sm font-medium text-gray-500">Klik untuk Upload Gambar</span>
+                                    <span className="text-xs text-gray-400 mt-1">Max 1MB (Langsung Simpan)</span>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="relative w-fit group">
+                            <img src={questionImage} alt="Preview Soal" className="max-h-48 rounded-lg border border-gray-200 shadow-sm" />
+                            <button 
+                                onClick={removeImage}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition transform hover:scale-110"
+                                title="Hapus Gambar"
+                            >
+                                <X size={16} />
+                            </button>
+                            <div className="mt-2 text-xs text-green-600 font-bold flex items-center gap-1">
+                                <CheckCircle2 size={12}/> Gambar Siap Disimpan
+                            </div>
+                        </div>
+                    )}
+                 </div>
+
+                 {questionType !== 'isian' ? (<>
+                       <div className="space-y-3 mb-6">{options.map((o, i) => (<div key={i} className="flex gap-3 items-center"><span className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-100 font-bold rounded-lg text-indigo-700">{['A','B','C','D','E'][i]}</span><input value={o} onChange={e => {const n=[...options];n[i]=e.target.value;setOptions(n)}} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none" placeholder={`Pilihan Jawaban ${['A','B','C','D','E'][i]}`} /></div>))}</div>
+                       <div className="mb-4"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):</label><div className="flex gap-3">{['A','B','C','D','E'].map(l => {const isSelected = questionType === 'pilihan_ganda' ? correctAnswer === l : correctAnswer.includes(l); return (<button key={l} onClick={() => { if (questionType === 'pilihan_ganda') setCorrectAnswer(l); else toggleMajemukAnswer(l); }} className={`flex-1 py-3 border-2 rounded-lg font-bold transition text-lg ${isSelected ? 'bg-green-50 text-white border-green-500 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>{l}</button>);})}</div></div></>) : (<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200"><label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1"><Key size={14}/> Kunci Jawaban (Teks/Angka):</label><input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)} className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" placeholder="Contoh: 25 atau Jakarta" /></div>)}
+                 
+                 <div className="flex gap-3 pt-4 border-t border-gray-200"><button onClick={addOrUpdate} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5">{editingId ? 'Simpan Perubahan' : 'Tambah Soal Baru'}</button>{editingId && <button onClick={resetForm} className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100">Batal Edit</button>}</div>
+               </div>
+               
+               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"><div className="flex-1 pr-4"><div className="flex items-center gap-2 mb-2"><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i+1}</span><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${q.type==='isian'?'bg-green-50 text-green-600 border-green-100':q.type==='pilihan_majemuk'?'bg-orange-50 text-orange-600 border-orange-100':'bg-gray-100 text-gray-500 border-gray-200'}`}>{q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}</span></div><p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p>{q.image && <div className="mt-2 text-xs text-blue-500 flex items-center gap-1"><ImageIcon size={12}/> Ada Gambar</div>}</div><div className="flex gap-2"><button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
+             </div>
+
+             <div className="lg:sticky lg:top-24 h-fit">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                        <span className="font-bold text-gray-700 bg-white border border-gray-200 px-3 py-1 rounded text-sm flex items-center gap-2">
+                            <Eye size={16} className="text-indigo-500"/> Pratinjau Soal (Tampilan Siswa)
+                        </span>
+                        <span className="text-xs font-bold px-2 py-1 rounded border bg-indigo-50 text-indigo-600 border-indigo-100 uppercase">
+                            {questionType.replace('_', ' ')}
+                        </span>
+                    </div>
+                    
+                    <div className="p-5">
+                        <div className="text-gray-800 text-sm leading-relaxed font-medium mb-4 text-left text-justify whitespace-pre-wrap">
+                            <Latex>{questionText || 'Belum ada pertanyaan...'}</Latex>
+                        </div>
+                        {questionImage && <img src={questionImage} className="w-full h-auto my-6 select-none object-contain" alt="Soal" />}
+                        
+                        <div className="space-y-2 text-sm">
+                            {questionType === 'isian' ? (
+                                <div className="bg-gray-50 p-4 rounded-lg border-2 border-dashed border-gray-300 opacity-70">
+                                    <input disabled className="w-full p-2 bg-transparent text-xl font-mono border-b-2 border-gray-300 outline-none" placeholder="Jawaban siswa..." />
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {options.map((opt, i) => {
+                                        const label = ['A','B','C','D','E'][i];
+                                        const isCorrect = questionType === 'pilihan_ganda' ? correctAnswer === label : correctAnswer.includes(label);
+                                        return (
+                                            <div key={i} className={`p-3 rounded-lg border flex gap-3 items-center ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+                                                <div className={`w-6 h-6 flex items-center justify-center font-bold rounded text-xs ${isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                                    {label}
+                                                </div>
+                                                <div className="font-medium text-gray-700">
+                                                    <Latex>{opt || `Pilihan ${label}`}</Latex>
+                                                </div>
+                                                {isCorrect && <CheckCircle2 size={16} className="text-green-500 ml-auto"/>}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <div className="mt-4 text-center text-xs text-gray-400">
+                    *Preview ini menampilkan bagaimana soal terlihat di aplikasi siswa.
+                </div>
+             </div>
+
           </div>
         )}
       </div>
