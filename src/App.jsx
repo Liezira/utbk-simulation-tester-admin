@@ -506,7 +506,8 @@ const UTBKAdminApp = () => {
                            <tr>
                                <th className="p-4">Kode</th>
                                <th className="p-4">Nama</th>
-                               <th className="p-4">Status</th>
+                               <th className="p-4">Status Token</th>
+                               <th className="p-4">Progres & Skor</th>
                                <th className="p-4 text-center">Kirim Ulang</th>
                                <th className="p-4 text-center">Aksi</th>
                            </tr>
@@ -522,6 +523,19 @@ const UTBKAdminApp = () => {
                                  </td>
                                  <td className="p-4"><span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${t.status === 'active' ? 'bg-green-100 text-green-700' : t.status === 'used' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>{t.status}</span></td>
                                  
+                                 <td className="p-4">
+                                    <div className="flex flex-col gap-1">
+                                        {t.score !== undefined && t.score !== null ? (
+                                            <>
+                                                <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded w-fit border border-blue-200">SELESAI</span>
+                                                <span className="text-sm font-bold text-gray-800 flex items-center gap-1">🏆 Skor: {t.score}</span>
+                                            </>
+                                        ) : (
+                                            <span className="text-gray-400 text-xs font-bold bg-gray-100 px-2 py-1 rounded w-fit">-</span>
+                                        )}
+                                    </div>
+                                 </td>
+
                                  <td className="p-4 text-center">
                                      <div className="mb-2 text-[10px] font-bold uppercase tracking-wide">
                                         {t.isSent ? (
@@ -542,7 +556,7 @@ const UTBKAdminApp = () => {
                                  </td>
                               </tr>
                            )) : (
-                               <tr><td colSpan="5" className="p-8 text-center text-gray-400 italic">Tidak ada data token ditemukan.</td></tr>
+                               <tr><td colSpan="6" className="p-8 text-center text-gray-400 italic">Tidak ada data token ditemukan.</td></tr>
                            )}
                          </tbody>
                       </table>
@@ -632,7 +646,7 @@ const UTBKAdminApp = () => {
                     
                     <div className="p-5">
                         <div className="text-gray-800 text-sm leading-relaxed font-medium mb-4 text-left text-justify whitespace-pre-wrap">
-                            <Latex>{questionText || 'Belum ada pertanyaan...'}</Latex>
+                            <Latex>{(questionText || 'Belum ada pertanyaan...').replace(/</g, ' < ')}</Latex>
                         </div>
                         {questionImage && <img src={questionImage} className="w-full h-auto my-6 select-none object-contain" alt="Soal" />}
                         
@@ -652,7 +666,7 @@ const UTBKAdminApp = () => {
                                                     {label}
                                                 </div>
                                                 <div className="font-medium text-gray-700">
-                                                    <Latex>{opt || `Pilihan ${label}`}</Latex>
+                                                    <Latex>{(opt || `Pilihan ${label}`).replace(/</g, ' < ')}</Latex>
                                                 </div>
                                                 {isCorrect && <CheckCircle2 size={16} className="text-green-500 ml-auto"/>}
                                             </div>
