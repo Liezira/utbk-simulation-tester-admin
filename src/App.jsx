@@ -578,4 +578,12 @@ const UTBKAdminApp = () => {
       </div>
       
       <div className="py-6 bg-white border-t border-gray-200 w-full text-center">
-        <p className="text-gray-400 text-xs
+        <p className="text-gray-400 text-xs font-mono flex items-center justify-center gap-1">
+          <Copyright size={12} /> {new Date().getFullYear()} Created by <span className="font-bold text-indigo-500">Liezira</span>
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default UTBKAdminApp;
