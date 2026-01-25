@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle, School, RefreshCcw, Trophy } from 'lucide-react';
+import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle, School, RefreshCcw, Trophy, X } from 'lucide-react';
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -23,17 +23,20 @@ const UTBKAdminApp = () => {
   const [screen, setScreen] = useState('admin_login'); 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-  const [viewMode, setViewMode] = useState('tokens'); // tokens | soal | leaderboard
+  const [viewMode, setViewMode] = useState('tokens');
   
   const [tokenList, setTokenList] = useState([]);
   const [bankSoal, setBankSoal] = useState({});
   const [filterStatus, setFilterStatus] = useState('all');
   
   const [newTokenName, setNewTokenName] = useState('');
-  const [newTokenSchool, setNewTokenSchool] = useState(''); // State Sekolah
+  const [newTokenSchool, setNewTokenSchool] = useState(''); // NEW: Input Sekolah
   const [newTokenPhone, setNewTokenPhone] = useState('');
   
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
+
+  // Leaderboard Modal State
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const [selectedSubtest, setSelectedSubtest] = useState('pu');
   const [questionText, setQuestionText] = useState('');
@@ -131,7 +134,7 @@ const UTBKAdminApp = () => {
   };
 
   const createToken = async () => {
-    if (!newTokenName || !newTokenPhone || !newTokenSchool) { alert('Isi Nama, Sekolah, & HP!'); return; }
+    if (!newTokenName || !newTokenPhone || !newTokenSchool) { alert('Isi Nama, Sekolah & HP!'); return; } // Validasi Sekolah
     const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     try { 
         await setDoc(doc(db, 'tokens', tokenCode), { 
@@ -148,21 +151,19 @@ const UTBKAdminApp = () => {
   };
 
   const deleteToken = async (code) => { if(confirm('Hapus token ini?')) { await deleteDoc(doc(db, 'tokens', code)); }};
-  
-  // --- FITUR RESET SCORE ---
-  const resetScore = async (code) => {
-      if(confirm('Reset ujian siswa ini? Status akan kembali AKTIF dan nilai dihapus.')) {
-          await updateDoc(doc(db, 'tokens', code), {
-              status: 'active',
-              score: null,
-              answers: {},
-              finalTimeLeft: null,
-              createdAt: new Date().toISOString() // Optional: Perpanjang masa aktif
-          });
-      }
-  };
-
   const deleteAllTokens = async () => { if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; try { await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); alert("Semua terhapus."); } catch (error) { alert("Gagal."); } };
+  
+  // --- RESET SEMUA SCORE (LEADERBOARD) ---
+  const resetLeaderboard = async () => {
+      if(!confirm("⚠️ Yakin ingin MERESET SEMUA SKOR di Leaderboard?\nStatus siswa akan kembali menjadi ACTIVE.")) return;
+      try {
+          const used = tokenList.filter(t => t.score !== null);
+          await Promise.all(used.map(t => updateDoc(doc(db, 'tokens', t.tokenCode), {
+              score: null, status: 'active', answers: {}, finishedAt: null
+          })));
+          alert("Leaderboard berhasil di-reset!");
+      } catch (e) { alert("Gagal reset."); }
+  };
 
   const saveSoal = async (sid, q) => { await setDoc(doc(db, 'bank_soal', sid), { questions: q }); setBankSoal(p => ({ ...p, [sid]: q })); };
   const addOrUpdate = async () => {
@@ -194,12 +195,13 @@ const UTBKAdminApp = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* HEADER */}
       <div className="sticky top-0 z-40 bg-white shadow px-6 py-4 flex justify-between items-center mb-6">
         <h1 className="text-xl font-bold text-indigo-900">Admin Panel</h1>
         <div className="flex gap-2">
           <button onClick={() => setViewMode('tokens')} className={`px-4 py-2 rounded ${viewMode==='tokens'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Token</button>
           <button onClick={() => setViewMode('soal')} className={`px-4 py-2 rounded ${viewMode==='soal'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Bank Soal</button>
-          <button onClick={() => setViewMode('leaderboard')} className={`px-4 py-2 rounded ${viewMode==='leaderboard'?'bg-yellow-100 text-yellow-700':'text-gray-600'}`}>🏆 Leaderboard</button>
+          <button onClick={() => setShowLeaderboard(true)} className="px-4 py-2 rounded bg-yellow-100 text-yellow-700 font-bold flex items-center gap-2"><Trophy size={16}/> Leaderboard</button>
           <button onClick={handleLogout} className="text-red-600 px-3"><LogOut size={18}/></button>
         </div>
       </div>
@@ -231,7 +233,7 @@ const UTBKAdminApp = () => {
 
               <div className="space-y-4">
                 <input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-2 border rounded" placeholder="Nama Siswa"/>
-                <input value={newTokenSchool} onChange={e=>setNewTokenSchool(e.target.value)} className="w-full p-2 border rounded" placeholder="Asal Sekolah"/>
+                <input value={newTokenSchool} onChange={e=>setNewTokenSchool(e.target.value)} className="w-full p-2 border rounded" placeholder="Asal Sekolah"/> {/* INPUT SEKOLAH */}
                 <input value={newTokenPhone} onChange={e=>setNewTokenPhone(e.target.value)} className="w-full p-2 border rounded" placeholder="No WhatsApp (08xxx)"/>
                 <button onClick={createToken} disabled={isSending} className={`w-full py-2 rounded transition text-white font-bold flex items-center justify-center gap-2 ${isSending ? 'bg-gray-400' : autoSendMode === 'fonnte' ? 'bg-green-600 hover:bg-green-700' : autoSendMode === 'js_app' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
                     {isSending ? 'Mengirim...' : 'Generate & Kirim'}
@@ -296,13 +298,7 @@ const UTBKAdminApp = () => {
                         </td>
 
                         <td className="p-2 text-center">
-                            <div className="flex gap-2 justify-center">
-                                {/* TOMBOL RESET KHUSUS USED */}
-                                {t.status === 'used' && !expired && (
-                                    <button onClick={()=>resetScore(t.tokenCode)} className="text-orange-500 hover:text-orange-700 bg-orange-50 p-2 rounded border border-orange-200" title="Reset Ujian"><RefreshCcw size={16}/></button>
-                                )}
-                                <button onClick={()=>deleteToken(t.tokenCode)} className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded border border-red-200" title="Hapus"><Trash2 size={16}/></button>
-                            </div>
+                            <button onClick={()=>deleteToken(t.tokenCode)} className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded border border-red-200"><Trash2 size={16}/></button>
                         </td>
                     </tr>)})}</tbody>
                   </table>
@@ -310,42 +306,7 @@ const UTBKAdminApp = () => {
               </div>
             </div>
           </div>
-        ) : viewMode === 'leaderboard' ? (
-           // --- VIEW LEADERBOARD ---
-           <div className="bg-white p-6 rounded-lg shadow">
-               <h2 className="text-2xl font-bold text-indigo-900 mb-6 flex items-center gap-2"><Trophy className="text-yellow-500"/> Live Leaderboard</h2>
-               <div className="overflow-x-auto">
-                   <table className="w-full text-left border-collapse">
-                       <thead className="bg-indigo-50 text-indigo-700">
-                           <tr>
-                               <th className="p-4 rounded-tl-lg">Peringkat</th>
-                               <th className="p-4">Nama Siswa</th>
-                               <th className="p-4">Asal Sekolah</th>
-                               <th className="p-4 text-center">Skor Akhir</th>
-                               <th className="p-4 rounded-tr-lg text-center">Waktu Selesai</th>
-                           </tr>
-                       </thead>
-                       <tbody className="divide-y divide-gray-100">
-                           {tokenList.filter(t => t.score !== null && t.score !== undefined).sort((a,b) => b.score - a.score).map((t, idx) => (
-                               <tr key={t.tokenCode} className="hover:bg-gray-50">
-                                   <td className="p-4 font-bold text-gray-600">
-                                       {idx===0 ? '🥇 1' : idx===1 ? '🥈 2' : idx===2 ? '🥉 3' : idx+1}
-                                   </td>
-                                   <td className="p-4 font-medium text-gray-800">{t.studentName}</td>
-                                   <td className="p-4 text-gray-600">{t.studentSchool || '-'}</td>
-                                   <td className="p-4 text-center font-bold text-indigo-600 text-lg">{t.score}</td>
-                                   <td className="p-4 text-center text-xs text-gray-400">{new Date(t.finishedAt || t.createdAt).toLocaleString()}</td>
-                               </tr>
-                           ))}
-                           {tokenList.filter(t => t.score !== null).length === 0 && (
-                               <tr><td colSpan="5" className="p-8 text-center text-gray-400 italic">Belum ada data nilai masuk.</td></tr>
-                           )}
-                       </tbody>
-                   </table>
-               </div>
-           </div>
         ) : (
-          // --- VIEW BANK SOAL (SAMA SEPERTI SEBELUMNYA) ---
           <div className="bg-white p-6 rounded-lg shadow">
              <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold">Editor Soal</h2><button onClick={generateDummy} className="text-sm bg-green-100 text-green-700 px-4 py-2 rounded hover:bg-green-200">+ Auto Fill</button></div>
              <div className="bg-gray-50 p-6 rounded-xl border mb-8">
@@ -359,6 +320,57 @@ const UTBKAdminApp = () => {
           </div>
         )}
       </div>
+
+      {/* --- LEADERBOARD POPUP MODAL --- */}
+      {showLeaderboard && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden relative">
+                  <div className="bg-indigo-600 p-4 flex justify-between items-center">
+                      <h2 className="text-white font-bold text-xl flex items-center gap-2"><Trophy className="text-yellow-400"/> Global Leaderboard</h2>
+                      <button onClick={()=>setShowLeaderboard(false)} className="text-white hover:bg-indigo-700 p-2 rounded-lg"><X size={24}/></button>
+                  </div>
+                  
+                  <div className="p-6">
+                      <div className="flex justify-end mb-4">
+                          <button onClick={resetLeaderboard} className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-100 transition border border-red-200">
+                              <Trash2 size={16}/> Reset Semua Data Peringkat
+                          </button>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-lg border border-indigo-100 max-h-[60vh] overflow-y-auto">
+                           <table className="w-full text-left border-collapse">
+                               <thead className="bg-indigo-50 text-indigo-700 sticky top-0 z-10">
+                                   <tr>
+                                       <th className="p-4">Peringkat</th>
+                                       <th className="p-4">Nama Siswa</th>
+                                       <th className="p-4">Asal Sekolah</th>
+                                       <th className="p-4 text-center">Skor Akhir</th>
+                                   </tr>
+                               </thead>
+                               <tbody className="divide-y divide-gray-100 text-sm">
+                                   {tokenList
+                                       .filter(t => t.score !== null && t.score !== undefined)
+                                       .sort((a,b) => b.score - a.score)
+                                       .map((t, idx) => (
+                                       <tr key={t.tokenCode} className="hover:bg-gray-50">
+                                           <td className="p-4 font-bold text-gray-600">
+                                               {idx===0 ? '🥇 1' : idx===1 ? '🥈 2' : idx===2 ? '🥉 3' : idx+1}
+                                           </td>
+                                           <td className="p-4 font-medium text-gray-800">{t.studentName}</td>
+                                           <td className="p-4 text-gray-600">{t.studentSchool || '-'}</td>
+                                           <td className="p-4 text-center font-bold text-indigo-600 text-lg">{t.score}</td>
+                                       </tr>
+                                   ))}
+                                   {tokenList.filter(t => t.score !== null).length === 0 && (
+                                       <tr><td colSpan="4" className="p-8 text-center text-gray-400 italic">Belum ada data nilai masuk.</td></tr>
+                                   )}
+                               </tbody>
+                           </table>
+                       </div>
+                  </div>
+              </div>
+          </div>
+      )}
       
       <div className="py-6 bg-white border-t border-gray-200 w-full text-center">
         <p className="text-gray-400 text-xs font-mono flex items-center justify-center gap-1">
