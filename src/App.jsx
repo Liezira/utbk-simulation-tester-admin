@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle } from 'lucide-react';
+import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle, School } from 'lucide-react';
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
