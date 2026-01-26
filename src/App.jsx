@@ -134,7 +134,7 @@ const UTBKAdminApp = () => {
     setIsSending(true);
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!\nTolong isi feedback dibawah untuk evaluasi kami, terimakasih\nhttps://forms.gle/NDsPSD5vCz3TSbRd8`;
     try {
         const params = new URLSearchParams({ token: FONNTE_TOKEN, target: formattedPhone, message: message, delay: SEND_DELAY, countryCode: '62' });
         await fetch(`https://api.fonnte.com/send?${params.toString()}`, { method: 'GET', mode: 'no-cors' });
@@ -146,7 +146,7 @@ const UTBKAdminApp = () => {
   const sendJsDirect = async (name, phone, token) => {
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!\nTolong isi feedback dibawah untuk evaluasi kami, terimakasih\nhttps://forms.gle/NDsPSD5vCz3TSbRd8`;
     window.location.href = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
     await markAsSent(token, 'JS App (Direct)');
   };
@@ -154,7 +154,7 @@ const UTBKAdminApp = () => {
   const sendManualWeb = async (name, phone, token) => {
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!\nTolong isi feedback dibawah untuk evaluasi kami, terimakasih\nhttps://forms.gle/NDsPSD5vCz3TSbRd8`;
     window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
     await markAsSent(token, 'WA Web (Manual)');
   };
