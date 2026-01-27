@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, CheckCircle2, XCircle, School, RefreshCcw, Trophy, X, Eye, Loader2, UploadCloud, Image as ImageIcon, List, CheckSquare, Type } from 'lucide-react';
+import { 
+  Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, 
+  MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
+  CheckCircle2, XCircle, RefreshCcw, Trophy, X, Eye, Loader2, UploadCloud, 
+  Image as ImageIcon, List, CheckSquare, Type, School 
+} from 'lucide-react';
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot, query, orderBy, deleteField } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -32,7 +37,7 @@ const UTBKAdminApp = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   
   const [newTokenName, setNewTokenName] = useState('');
-  const [newTokenSchool, setNewTokenSchool] = useState(''); 
+  const [newTokenSchool, setNewTokenSchool] = useState('');
   const [newTokenPhone, setNewTokenPhone] = useState('');
   
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
@@ -112,15 +117,6 @@ const UTBKAdminApp = () => {
   };
 
   // --- ACTIONS ---
-  
-  // MANUAL LOAD TOKENS (Untuk Tombol Refresh)
-  const loadTokens = async () => {
-      const s = await getDocs(collection(db, 'tokens'));
-      const t = [];
-      s.forEach((d) => t.push({ id: d.id, ...d.data() }));
-      t.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setTokenList(t);
-  };
 
   const markAsSent = async (tokenCode, method) => {
     try {
@@ -134,7 +130,7 @@ const UTBKAdminApp = () => {
     setIsSending(true);
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!\nTolong isi feedback dibawah untuk evaluasi kami, terimakasih\nhttps://forms.gle/NDsPSD5vCz3TSbRd8`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
     try {
         const params = new URLSearchParams({ token: FONNTE_TOKEN, target: formattedPhone, message: message, delay: SEND_DELAY, countryCode: '62' });
         await fetch(`https://api.fonnte.com/send?${params.toString()}`, { method: 'GET', mode: 'no-cors' });
@@ -146,7 +142,7 @@ const UTBKAdminApp = () => {
   const sendJsDirect = async (name, phone, token) => {
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!\nTolong isi feedback dibawah untuk evaluasi kami, terimakasih\nhttps://forms.gle/NDsPSD5vCz3TSbRd8`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
     window.location.href = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
     await markAsSent(token, 'JS App (Direct)');
   };
@@ -154,13 +150,13 @@ const UTBKAdminApp = () => {
   const sendManualWeb = async (name, phone, token) => {
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!\nTolong isi feedback dibawah untuk evaluasi kami, terimakasih\nhttps://forms.gle/NDsPSD5vCz3TSbRd8`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
     window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
     await markAsSent(token, 'WA Web (Manual)');
   };
 
   const createToken = async () => {
-    if (!newTokenName || !newTokenPhone || !newTokenSchool) { alert('Isi Nama, Sekolah & HP!'); return; } 
+    if (!newTokenName || !newTokenPhone || !newTokenSchool) { alert('Isi Nama, Sekolah & HP!'); return; }
     const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     try { 
         await setDoc(doc(db, 'tokens', tokenCode), { 
@@ -431,21 +427,18 @@ const UTBKAdminApp = () => {
               </div>
 
               <div className="bg-white p-6 rounded-xl shadow">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="font-bold text-lg">List Token</h2>
-                    <div className="flex gap-2">
-                        <button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>
-                        {tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}
-                    </div>
-                </div>
+                <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-lg">List Token</h2><div className="flex gap-2"><button onClick={() => location.reload()} className="text-indigo-600 text-sm">Refresh</button>{tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}</div></div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 sticky top-0">
                         <tr>
                             <th className="p-2">Kode</th>
                             <th className="p-2">Nama & Sekolah</th>
-                            <th className="p-2">Status</th>
-                            <th className="p-2">Kirim Ulang</th> 
+                            <th className="p-2">Status Token</th>
+                            {/* KOLOM BARU: STATUS KIRIM */}
+                            <th className="p-2">Status Kirim</th> 
+                            <th className="p-2 text-center">Progres & Skor</th>
+                            <th className="p-2 text-center">Kirim Ulang</th> 
                             <th className="p-2 text-center">Aksi</th>
                         </tr>
                     </thead>
@@ -465,7 +458,32 @@ const UTBKAdminApp = () => {
                         </td>
                         <td className="p-2"><span className={`px-2 py-1 rounded text-xs font-bold ${statusColor}`}>{statusLabel}</span></td>
                         
-                        <td className="p-2 flex gap-1">
+                        {/* KOLOM BARU: STATUS KIRIM */}
+                        <td className="p-2">
+                            {t.isSent ? (
+                                <div className="flex flex-col">
+                                    <span className="flex items-center gap-1 text-green-600 font-bold text-xs"><CheckCircle2 size={12}/> Terkirim</span>
+                                    <span className="text-[10px] text-gray-400">{t.sentMethod}</span>
+                                </div>
+                            ) : (
+                                <span className="flex items-center gap-1 text-gray-400 text-xs"><XCircle size={12}/> Belum</span>
+                            )}
+                        </td>
+
+                        <td className="p-4 text-center">
+                            <div className="flex flex-col gap-1 items-center">
+                                {t.score !== undefined && t.score !== null ? (
+                                    <>
+                                        <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded w-fit border border-blue-200">SELESAI</span>
+                                        <span className="text-sm font-bold text-gray-800 flex items-center gap-1">🏆 Skor: {t.score}</span>
+                                    </>
+                                ) : (
+                                    <span className="text-gray-400 text-xs font-bold bg-gray-100 px-2 py-1 rounded w-fit">-</span>
+                                )}
+                            </div>
+                        </td>
+                        
+                        <td className="p-2 flex gap-1 justify-center">
                             <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-green-50 text-green-700 p-1.5 rounded hover:bg-green-100"><Zap size={14}/></button>
                             <button onClick={() => sendManualWeb(t.studentName, t.studentPhone, t.tokenCode)} className="bg-blue-50 text-blue-700 p-1.5 rounded hover:bg-blue-100"><ExternalLink size={14}/></button>
                             <button onClick={() => sendJsDirect(t.studentName, t.studentPhone, t.tokenCode)} className="bg-purple-50 text-purple-700 p-1.5 rounded hover:bg-purple-100"><Smartphone size={14}/></button>
@@ -531,7 +549,7 @@ const UTBKAdminApp = () => {
                  <div className="flex gap-3 pt-4 border-t border-gray-200"><button onClick={addOrUpdate} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5">{editingId ? 'Simpan Perubahan' : 'Tambah Soal Baru'}</button>{editingId && <button onClick={resetForm} className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100">Batal Edit</button>}</div>
                </div>
                
-               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"><div className="flex-1 pr-4"><div className="flex items-center gap-2 mb-2"><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i+1}</span><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${q.type==='isian'?'bg-green-50 text-green-600 border-green-100':q.type==='pilihan_majemuk'?'bg-orange-50 text-orange-600 border-orange-100':'bg-gray-100 text-gray-500 border-gray-200'}`}>{q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}</span></div><p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p>{q.image && <div className="mt-2 text-xs text-blue-500 flex items-center gap-1"><ImageIcon size={12}/> Ada Gambar</div>}</div><div className="flex gap-2"><button onClick={() => { setQuestionText(q.question); setQuestionImage(q.image||''); setQuestionType(q.type || 'pilihan_ganda'); if (q.type === 'isian') { setOptions(['', '', '', '', '']); setCorrectAnswer(q.correct); } else { setOptions([...q.options]); setCorrectAnswer(q.correct); } setEditingId(q.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
+               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"><div className="flex-1 pr-4"><div className="flex items-center gap-2 mb-2"><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i+1}</span><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${q.type==='isian'?'bg-green-50 text-green-600 border-green-100':q.type==='pilihan_majemuk'?'bg-orange-50 text-orange-600 border-orange-100':'bg-gray-100 text-gray-500 border-gray-200'}`}>{q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}</span></div><p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p>{q.image && <div className="mt-2 text-xs text-blue-500 flex items-center gap-1"><ImageIcon size={12}/> Ada Gambar</div>}</div><div className="flex gap-2"><button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
              </div>
 
              <div className="lg:sticky lg:top-24 h-fit">
