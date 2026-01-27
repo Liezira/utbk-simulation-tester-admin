@@ -117,6 +117,14 @@ const UTBKAdminApp = () => {
   };
 
   // --- ACTIONS ---
+  // MANUAL LOAD TOKENS (Untuk Tombol Refresh)
+  const loadTokens = async () => {
+      const s = await getDocs(collection(db, 'tokens'));
+      const t = [];
+      s.forEach((d) => t.push({ id: d.id, ...d.data() }));
+      t.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setTokenList(t);
+
 
   const markAsSent = async (tokenCode, method) => {
     try {
