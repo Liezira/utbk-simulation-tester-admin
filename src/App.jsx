@@ -37,7 +37,7 @@ const UTBKAdminApp = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   
   const [newTokenName, setNewTokenName] = useState('');
-  const [newTokenSchool, setNewTokenSchool] = useState('');
+  const [newTokenSchool, setNewTokenSchool] = useState(''); 
   const [newTokenPhone, setNewTokenPhone] = useState('');
   
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
@@ -117,14 +117,14 @@ const UTBKAdminApp = () => {
   };
 
   // --- ACTIONS ---
-  // MANUAL LOAD TOKENS (Untuk Tombol Refresh)
+  
+  // MANUAL LOAD TOKENS (Untuk Tombol Refresh - TANPA RELOAD PAGE)
   const loadTokens = async () => {
-      const s = await getDocs(collection(db, 'tokens'));
-      const t = [];
-      s.forEach((d) => t.push({ id: d.id, ...d.data() }));
-      t.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const q = query(collection(db, 'tokens'), orderBy('createdAt', 'desc'));
+      const s = await getDocs(q);
+      const t = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTokenList(t);
-
+  };
 
   const markAsSent = async (tokenCode, method) => {
     try {
@@ -164,7 +164,7 @@ const UTBKAdminApp = () => {
   };
 
   const createToken = async () => {
-    if (!newTokenName || !newTokenPhone || !newTokenSchool) { alert('Isi Nama, Sekolah & HP!'); return; }
+    if (!newTokenName || !newTokenPhone || !newTokenSchool) { alert('Isi Nama, Sekolah & HP!'); return; } 
     const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     try { 
         await setDoc(doc(db, 'tokens', tokenCode), { 
@@ -435,7 +435,14 @@ const UTBKAdminApp = () => {
               </div>
 
               <div className="bg-white p-6 rounded-xl shadow">
-                <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-lg">List Token</h2><div className="flex gap-2"><button onClick={() => location.reload()} className="text-indigo-600 text-sm">Refresh</button>{tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}</div></div>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="font-bold text-lg">List Token</h2>
+                    <div className="flex gap-2">
+                        {/* UPDATE: REFRESH BUTTON ONLY CALLS loadTokens */}
+                        <button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>
+                        {tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}
+                    </div>
+                </div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 sticky top-0">
