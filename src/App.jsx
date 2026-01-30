@@ -3,7 +3,8 @@ import {
   Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, 
   MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
   CheckCircle2, XCircle, RefreshCcw, Trophy, X, Eye, Loader2, UploadCloud, 
-  Image as ImageIcon, List, CheckSquare, Type, School, Users, Wallet, Coins 
+  Image as ImageIcon, List, CheckSquare, Type, School, Users, Wallet, Coins,
+  ChevronLeft, ChevronRight  // ✅ DITAMBAHKAN: Import yang hilang
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import { 
@@ -36,11 +37,11 @@ const UTBKAdminApp = () => {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   
-  // VIEW MODE: 'tokens' | 'soal' | 'users' (NEW)
+  // VIEW MODE: 'tokens' | 'soal' | 'users'
   const [viewMode, setViewMode] = useState('tokens');
   
   const [tokenList, setTokenList] = useState([]);
-  const [userList, setUserList] = useState([]); // NEW: State untuk User
+  const [userList, setUserList] = useState([]);
   const [bankSoal, setBankSoal] = useState({});
   const [filterStatus, setFilterStatus] = useState('all');
   
@@ -49,6 +50,13 @@ const UTBKAdminApp = () => {
   const [newTokenPhone, setNewTokenPhone] = useState('');
   
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
+
+  // ✅ DITAMBAHKAN: State untuk pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isNextAvailable, setIsNextAvailable] = useState(false);
+  const [lastVisible, setLastVisible] = useState(null);
+  const [firstVisible, setFirstVisible] = useState(null);
+  const [pageHistory, setPageHistory] = useState([]);
 
   // Leaderboard Modal State
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -75,6 +83,13 @@ const UTBKAdminApp = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const t = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTokenList(t);
+      
+      // Update pagination info
+      if (snapshot.docs.length > 0) {
+        setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+        setFirstVisible(snapshot.docs[0]);
+        setIsNextAvailable(snapshot.docs.length === 50);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -111,8 +126,20 @@ const UTBKAdminApp = () => {
     loadBankSoal();
   }, []);
 
-  const handleLogin = async (e) => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, adminEmail, adminPassword); setScreen('dashboard'); } catch (error) { alert('Login Gagal.'); } };
-  const handleLogout = async () => { await signOut(auth); setScreen('admin_login'); };
+  const handleLogin = async (e) => { 
+    e.preventDefault(); 
+    try { 
+      await signInWithEmailAndPassword(auth, adminEmail, adminPassword); 
+      setScreen('dashboard'); 
+    } catch (error) { 
+      alert('Login Gagal: ' + error.message); 
+    } 
+  };
+  
+  const handleLogout = async () => { 
+    await signOut(auth); 
+    setScreen('admin_login'); 
+  };
 
   // --- HELPER STATUS ---
   const isExpired = (createdAt) => {
@@ -142,6 +169,62 @@ const UTBKAdminApp = () => {
           return b.finalTimeLeft - a.finalTimeLeft;
       });
       return rankedTokens;
+  };
+
+  // ✅ DITAMBAHKAN: Fungsi fetchTokens yang hilang
+  const fetchTokens = async (direction) => {
+    try {
+      let q;
+      
+      if (direction === 'first') {
+        // Reset ke halaman pertama
+        q = query(
+          collection(db, 'tokens'),
+          orderBy('createdAt', 'desc'),
+          limit(50)
+        );
+        setCurrentPage(1);
+        setPageHistory([]);
+      } else if (direction === 'next' && lastVisible) {
+        // Halaman berikutnya
+        q = query(
+          collection(db, 'tokens'),
+          orderBy('createdAt', 'desc'),
+          startAfter(lastVisible),
+          limit(50)
+        );
+        setPageHistory([...pageHistory, firstVisible]);
+        setCurrentPage(currentPage + 1);
+      } else if (direction === 'prev' && pageHistory.length > 0) {
+        // Halaman sebelumnya
+        const previousFirst = pageHistory[pageHistory.length - 1];
+        q = query(
+          collection(db, 'tokens'),
+          orderBy('createdAt', 'desc'),
+          startAfter(previousFirst),
+          limit(50)
+        );
+        setPageHistory(pageHistory.slice(0, -1));
+        setCurrentPage(currentPage - 1);
+      } else {
+        return; // Tidak ada aksi
+      }
+
+      const snapshot = await getDocs(q);
+      const t = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setTokenList(t);
+      
+      if (snapshot.docs.length > 0) {
+        setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+        setFirstVisible(snapshot.docs[0]);
+        setIsNextAvailable(snapshot.docs.length === 50);
+      } else {
+        setIsNextAvailable(false);
+      }
+    } catch (error) {
+      console.error("Error fetching tokens:", error);
+      alert("Gagal memuat data token");
+    }
   };
 
 // --- ACTIONS: TOKENS ---
@@ -316,7 +399,8 @@ const UTBKAdminApp = () => {
   };
 
   const deleteAllTokens = async () => { if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; try { await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); alert("Semua terhapus."); fetchTokens('first'); } catch (error) { alert("Gagal."); } };
-  // --- ACTIONS: USER MANAGEMENT (NEW) ---
+  
+  // --- ACTIONS: USER MANAGEMENT ---
   const handleAddCredits = async (userId) => {
       const amount = prompt("Masukkan jumlah credit yang ingin ditambahkan (cth: 5):");
       if(amount && !isNaN(amount)) {
@@ -484,10 +568,8 @@ const UTBKAdminApp = () => {
         <h1 className="text-xl font-bold text-indigo-900">Admin Panel</h1>
         <div className="flex gap-2">
           <button onClick={() => setViewMode('tokens')} className={`px-4 py-2 rounded ${viewMode==='tokens'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Token</button>
-          {/* TOMBOL BARU: USERS & CREDITS */}
           <button onClick={() => setViewMode('users')} className={`px-4 py-2 rounded flex items-center gap-2 ${viewMode==='users'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}><Users size={16}/> Users & Credits</button>
           <button onClick={() => setViewMode('soal')} className={`px-4 py-2 rounded ${viewMode==='soal'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Bank Soal</button>
-          {/* TOMBOL LEADERBOARD */}
           <button onClick={() => setShowLeaderboard(true)} className="px-4 py-2 rounded bg-yellow-100 text-yellow-700 font-bold flex items-center gap-2 hover:bg-yellow-200 transition"><Trophy size={16}/> Leaderboard</button>
           <button onClick={handleLogout} className="text-red-600 px-3"><LogOut size={18}/></button>
         </div>
@@ -526,27 +608,26 @@ const UTBKAdminApp = () => {
                     {isSending ? 'Mengirim...' : 'Generate & Kirim'}
                 </button>
               </div>
-              {/* --- SEPARATOR --- */}
-                <div className="relative flex py-2 items-center">
-                    <div className="flex-grow border-t border-gray-200"></div>
-                    <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">ATAU IMPORT EXCEL</span>
-                    <div className="flex-grow border-t border-gray-200"></div>
-                </div>
+              
+              <div className="relative flex py-2 items-center">
+                  <div className="flex-grow border-t border-gray-200"></div>
+                  <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">ATAU IMPORT EXCEL</span>
+                  <div className="flex-grow border-t border-gray-200"></div>
+              </div>
 
-                {/* --- TOMBOL IMPORT --- */}
-                <div className="relative">
-                    <input 
-                        type="file" 
-                        accept=".xlsx, .xls, .csv" 
-                        onChange={handleImportExcel} 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        disabled={isSending}
-                    />
-                    <button className="w-full py-2 rounded border-2 border-dashed border-indigo-300 text-indigo-600 font-bold hover:bg-indigo-50 flex items-center justify-center gap-2 transition">
-                        <UploadCloud size={18}/> Upload Data Siswa (.xlsx)
-                    </button>
-                </div>
-                <p className="text-[10px] text-gray-400 text-center">Format Kolom: Nama, Sekolah, HP</p>
+              <div className="relative">
+                  <input 
+                      type="file" 
+                      accept=".xlsx, .xls, .csv" 
+                      onChange={handleImportExcel} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      disabled={isSending}
+                  />
+                  <button className="w-full py-2 rounded border-2 border-dashed border-indigo-300 text-indigo-600 font-bold hover:bg-indigo-50 flex items-center justify-center gap-2 transition">
+                      <UploadCloud size={18}/> Upload Data Siswa (.xlsx)
+                  </button>
+              </div>
+              <p className="text-[10px] text-gray-400 text-center">Format Kolom: Nama, Sekolah, HP</p>
             </div>
 
             {/* --- KANAN: STATISTIK & TABEL --- */}
@@ -684,7 +765,7 @@ const UTBKAdminApp = () => {
             </div>
           </div>
         ) : viewMode === 'users' ? (
-          // --- TAB USER MANAGEMENT (NEW) ---
+          // --- TAB USER MANAGEMENT ---
           <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white p-6 rounded-xl shadow border border-indigo-100">
