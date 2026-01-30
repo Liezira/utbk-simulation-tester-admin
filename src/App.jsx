@@ -3,10 +3,13 @@ import {
   Edit, Plus, Trash2, LogOut, Key, BarChart3, Filter, Copyright, 
   MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
   CheckCircle2, XCircle, RefreshCcw, Trophy, X, Eye, Loader2, UploadCloud, 
-  Image as ImageIcon, List, CheckSquare, Type, School 
+  Image as ImageIcon, List, CheckSquare, Type, School, Users, Wallet, Coins 
 } from 'lucide-react';
 import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot, query, orderBy, deleteField } from 'firebase/firestore';
+import { 
+  doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, 
+  onSnapshot, query, orderBy, deleteField, increment 
+} from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import 'katex/dist/katex.min.css';
 import Latex from 'react-latex-next';
@@ -30,14 +33,17 @@ const UTBKAdminApp = () => {
   const [screen, setScreen] = useState('admin_login'); 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  
+  // VIEW MODE: 'tokens' | 'soal' | 'users' (NEW)
   const [viewMode, setViewMode] = useState('tokens');
   
   const [tokenList, setTokenList] = useState([]);
+  const [userList, setUserList] = useState([]); // NEW: State untuk User
   const [bankSoal, setBankSoal] = useState({});
   const [filterStatus, setFilterStatus] = useState('all');
   
   const [newTokenName, setNewTokenName] = useState('');
-  const [newTokenSchool, setNewTokenSchool] = useState(''); 
+  const [newTokenSchool, setNewTokenSchool] = useState('');
   const [newTokenPhone, setNewTokenPhone] = useState('');
   
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
@@ -62,6 +68,17 @@ const UTBKAdminApp = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const t = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTokenList(t);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // --- LOAD DATA REALTIME (USERS) - NEW FITUR ---
+  useEffect(() => {
+    // Mengambil data user yang register untuk manajemen credits
+    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const u = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUserList(u);
     });
     return () => unsubscribe();
   }, []);
@@ -116,9 +133,9 @@ const UTBKAdminApp = () => {
       return rankedTokens;
   };
 
-  // --- ACTIONS ---
-  
-  // MANUAL LOAD TOKENS (Untuk Tombol Refresh - TANPA RELOAD PAGE)
+  // --- ACTIONS: TOKENS ---
+
+  // MANUAL LOAD TOKENS (Untuk Tombol Refresh)
   const loadTokens = async () => {
       const q = query(collection(db, 'tokens'), orderBy('createdAt', 'desc'));
       const s = await getDocs(q);
@@ -167,8 +184,9 @@ const UTBKAdminApp = () => {
     if (!newTokenName || !newTokenPhone || !newTokenSchool) { alert('Isi Nama, Sekolah & HP!'); return; } 
     const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     try { 
+        // CreatedBy ADMIN menandakan ini token manual gratis dari admin
         await setDoc(doc(db, 'tokens', tokenCode), { 
-            tokenCode, studentName: newTokenName, studentSchool: newTokenSchool, studentPhone: newTokenPhone, status: 'active', createdAt: new Date().toISOString(), isSent: false, sentMethod: '-', score: null 
+            tokenCode, studentName: newTokenName, studentSchool: newTokenSchool, studentPhone: newTokenPhone, status: 'active', createdAt: new Date().toISOString(), isSent: false, sentMethod: '-', score: null, createdBy: 'ADMIN' 
         });
         
         if(confirm(`Token Berhasil: ${tokenCode}\n\nKirim via Jalur Default?`)) {
@@ -185,15 +203,32 @@ const UTBKAdminApp = () => {
   const resetScore = async (code) => {
       if(confirm('Reset ujian siswa ini? Status akan kembali AKTIF dan nilai dihapus.')) {
           await updateDoc(doc(db, 'tokens', code), {
-              status: 'active',
-              score: null,
-              answers: {},
-              finalTimeLeft: null,
-              createdAt: new Date().toISOString()
+              status: 'active', score: null, answers: {}, finalTimeLeft: null, createdAt: new Date().toISOString()
           });
       }
   };
 
+  const deleteAllTokens = async () => { if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; try { await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); alert("Semua terhapus."); } catch (error) { alert("Gagal."); } };
+
+  // --- ACTIONS: USER MANAGEMENT (NEW) ---
+  const handleAddCredits = async (userId) => {
+      const amount = prompt("Masukkan jumlah credit yang ingin ditambahkan (cth: 5):");
+      if(amount && !isNaN(amount)) {
+          try {
+              const userRef = doc(db, 'users', userId);
+              await updateDoc(userRef, { credits: increment(parseInt(amount)) });
+              alert(`Berhasil menambahkan ${amount} credits.`);
+          } catch(e) { alert("Gagal update credits."); }
+      }
+  };
+
+  const handleDeleteUser = async (userId) => {
+      if(confirm("Hapus user ini? Data credit akan hilang.")) {
+          await deleteDoc(doc(db, 'users', userId));
+      }
+  };
+
+  // --- ACTIONS: LEADERBOARD & BANK SOAL ---
   const resetLeaderboard = async () => {
     if (!confirm("⚠️ RESET SEMUA SKOR DI LEADERBOARD?\nToken akan tetap aktif, tapi nilai akan hilang.")) return;
     try {
@@ -204,14 +239,10 @@ const UTBKAdminApp = () => {
                  updates.push(updateDoc(docSnap.ref, { score: deleteField(), finalTimeLeft: deleteField(), finishedAt: deleteField(), status: 'active', answers: {} }));
              }
         });
-        await Promise.all(updates); 
-        alert("✅ Leaderboard Berhasil Direset!"); 
+        await Promise.all(updates); alert("✅ Leaderboard Berhasil Direset!"); 
     } catch (error) { alert("Gagal reset."); }
   };
 
-  const deleteAllTokens = async () => { if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; try { await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); alert("Semua terhapus."); } catch (error) { alert("Gagal."); } };
-
-  // --- BANK SOAL LOGIC ---
   const saveSoal = async (sid, q) => { await setDoc(doc(db, 'bank_soal', sid), { questions: q }); setBankSoal(p => ({ ...p, [sid]: q })); };
   
   const addOrUpdate = async () => {
@@ -222,21 +253,13 @@ const UTBKAdminApp = () => {
 
     const newQuestion = { 
         id: editingId || Date.now().toString(), 
-        type: questionType, 
-        question: questionText, 
-        image: questionImage, 
+        type: questionType, question: questionText, image: questionImage, 
         options: questionType === 'isian' ? [] : options, 
         correct: correctAnswer 
     };
-
     const currentQuestions = bankSoal[selectedSubtest] || [];
-    const updatedQuestions = editingId 
-        ? currentQuestions.map(q => q.id === editingId ? newQuestion : q) 
-        : [...currentQuestions, newQuestion];
-    
-    await saveSoal(selectedSubtest, updatedQuestions); 
-    alert('Disimpan!'); 
-    resetForm();
+    const updatedQuestions = editingId ? currentQuestions.map(q => q.id === editingId ? newQuestion : q) : [...currentQuestions, newQuestion];
+    await saveSoal(selectedSubtest, updatedQuestions); alert('Disimpan!'); resetForm();
   };
 
   const deleteSoal = async (id) => { 
@@ -247,46 +270,33 @@ const UTBKAdminApp = () => {
       }
   };
   
-  const resetForm = () => { 
-      setQuestionText(''); setQuestionImage(''); setOptions(['', '', '', '', '']); setEditingId(null); handleTypeChange('pilihan_ganda'); 
-  };
-
+  const resetForm = () => { setQuestionText(''); setQuestionImage(''); setOptions(['', '', '', '', '']); setEditingId(null); handleTypeChange('pilihan_ganda'); };
   const handleTypeChange = (type) => {
       setQuestionType(type);
       if (type === 'pilihan_ganda') setCorrectAnswer('A');
       else if (type === 'pilihan_majemuk') setCorrectAnswer([]); 
       else if (type === 'isian') setCorrectAnswer(''); 
   };
-
   const toggleMajemukAnswer = (opt) => {
       let current = Array.isArray(correctAnswer) ? [...correctAnswer] : [];
-      if (current.includes(opt)) current = current.filter(x => x !== opt);
-      else current.push(opt);
+      if (current.includes(opt)) current = current.filter(x => x !== opt); else current.push(opt);
       setCorrectAnswer(current);
   };
-
   const loadSoalForEdit = (q) => {
-      setQuestionText(q.question); 
-      setQuestionImage(q.image || ''); 
-      setQuestionType(q.type || 'pilihan_ganda'); 
+      setQuestionText(q.question); setQuestionImage(q.image || ''); setQuestionType(q.type || 'pilihan_ganda'); 
       if (q.type === 'isian') { setOptions(['', '', '', '', '']); setCorrectAnswer(q.correct); } 
       else { setOptions([...q.options]); setCorrectAnswer(q.correct); }
-      setEditingId(q.id); 
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setEditingId(q.id); window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 1024 * 1024) { alert("⚠️ File terlalu besar! Maksimal 1MB."); return; }
-    setIsUploading(true);
-    const reader = new FileReader();
+    setIsUploading(true); const reader = new FileReader();
     reader.onloadend = () => { setQuestionImage(reader.result); setIsUploading(false); };
     reader.readAsDataURL(file);
   };
-
   const removeImage = () => { setQuestionImage(''); };
-
   const generateDummy = async () => { if (!confirm('Isi Dummy?')) return; const n = { ...bankSoal }; for (const s of SUBTESTS) { const cur = bankSoal[s.id] || []; const need = s.questions - cur.length; if (need > 0) { const d = []; for (let i = 0; i < need; i++) d.push({ id: `d_${s.id}_${i}`, question: `Dummy ${s.name} ${i+1}`, image: '', options: ['A','B','C','D','E'], correct: 'A' }); const fin = [...cur, ...d]; await setDoc(doc(db, 'bank_soal', s.id), { questions: fin }); n[s.id] = fin; } } setBankSoal(n); alert('Dummy Done!'); };
 
   // --- UI COMPONENTS ---
@@ -368,6 +378,8 @@ const UTBKAdminApp = () => {
         <h1 className="text-xl font-bold text-indigo-900">Admin Panel</h1>
         <div className="flex gap-2">
           <button onClick={() => setViewMode('tokens')} className={`px-4 py-2 rounded ${viewMode==='tokens'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Token</button>
+          {/* TOMBOL BARU: USERS & CREDITS */}
+          <button onClick={() => setViewMode('users')} className={`px-4 py-2 rounded flex items-center gap-2 ${viewMode==='users'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}><Users size={16}/> Users & Credits</button>
           <button onClick={() => setViewMode('soal')} className={`px-4 py-2 rounded ${viewMode==='soal'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Bank Soal</button>
           {/* TOMBOL LEADERBOARD */}
           <button onClick={() => setShowLeaderboard(true)} className="px-4 py-2 rounded bg-yellow-100 text-yellow-700 font-bold flex items-center gap-2 hover:bg-yellow-200 transition"><Trophy size={16}/> Leaderboard</button>
@@ -403,7 +415,6 @@ const UTBKAdminApp = () => {
 
               <div className="space-y-4">
                 <input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-2 border rounded" placeholder="Nama Siswa"/>
-                {/* INPUT SEKOLAH */}
                 <input value={newTokenSchool} onChange={e=>setNewTokenSchool(e.target.value)} className="w-full p-2 border rounded" placeholder="Asal Sekolah"/>
                 <input value={newTokenPhone} onChange={e=>setNewTokenPhone(e.target.value)} className="w-full p-2 border rounded" placeholder="No WhatsApp (08xxx)"/>
                 <button onClick={createToken} disabled={isSending} className={`w-full py-2 rounded transition text-white font-bold flex items-center justify-center gap-2 ${isSending ? 'bg-gray-400' : autoSendMode === 'fonnte' ? 'bg-green-600 hover:bg-green-700' : autoSendMode === 'js_app' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
@@ -414,7 +425,6 @@ const UTBKAdminApp = () => {
 
             {/* --- KANAN: STATISTIK & TABEL --- */}
             <div className="md:col-span-2 space-y-4">
-              
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <button onClick={() => setFilterStatus('all')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                   <p className="text-xs text-gray-500 uppercase font-bold">Total</p>
@@ -438,7 +448,6 @@ const UTBKAdminApp = () => {
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="font-bold text-lg">List Token</h2>
                     <div className="flex gap-2">
-                        {/* UPDATE: REFRESH BUTTON ONLY CALLS loadTokens */}
                         <button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>
                         {tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}
                     </div>
@@ -450,7 +459,6 @@ const UTBKAdminApp = () => {
                             <th className="p-2">Kode</th>
                             <th className="p-2">Nama & Sekolah</th>
                             <th className="p-2">Status Token</th>
-                            {/* KOLOM BARU: STATUS KIRIM */}
                             <th className="p-2">Status Kirim</th> 
                             <th className="p-2 text-center">Progres & Skor</th>
                             <th className="p-2 text-center">Kirim Ulang</th> 
@@ -467,13 +475,11 @@ const UTBKAdminApp = () => {
                         <td className="p-2 font-mono text-indigo-600 font-bold">{t.tokenCode}</td>
                         <td className="p-2">
                             <div className="font-bold text-gray-800">{t.studentName}</div>
-                            {/* TAMPILAN SEKOLAH */}
                             <div className="text-xs text-gray-500 flex items-center gap-1"><School size={10}/> {t.studentSchool || '-'}</div>
                             <div className="text-[10px] text-gray-400">{t.studentPhone}</div>
                         </td>
                         <td className="p-2"><span className={`px-2 py-1 rounded text-xs font-bold ${statusColor}`}>{statusLabel}</span></td>
                         
-                        {/* KOLOM BARU: STATUS KIRIM */}
                         <td className="p-2">
                             {t.isSent ? (
                                 <div className="flex flex-col">
@@ -506,7 +512,6 @@ const UTBKAdminApp = () => {
 
                         <td className="p-2 text-center">
                             <div className="flex gap-2 justify-center">
-                                {/* TOMBOL RESET KHUSUS USED */}
                                 {t.status === 'used' && !expired && (
                                     <button onClick={()=>resetScore(t.tokenCode)} className="text-orange-500 hover:text-orange-700 bg-orange-50 p-2 rounded border border-orange-200" title="Reset Ujian"><RefreshCcw size={16}/></button>
                                 )}
@@ -518,6 +523,69 @@ const UTBKAdminApp = () => {
                 </div>
               </div>
             </div>
+          </div>
+        ) : viewMode === 'users' ? (
+          // --- TAB USER MANAGEMENT (NEW) ---
+          <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white p-6 rounded-xl shadow border border-indigo-100">
+                      <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Users</h3>
+                      <div className="text-3xl font-black text-indigo-900">{userList.length}</div>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl shadow border border-green-100">
+                      <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Credits Beredar</h3>
+                      <div className="text-3xl font-black text-green-600">{userList.reduce((acc, u) => acc + (u.credits || 0), 0)}</div>
+                  </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl shadow">
+                  <h2 className="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2"><Wallet size={20}/> Manajemen Saldo User</h2>
+                  <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                          <thead className="bg-gray-50">
+                              <tr>
+                                  <th className="p-3">Nama & Email</th>
+                                  <th className="p-3">Sekolah</th>
+                                  <th className="p-3">HP</th>
+                                  <th className="p-3 text-center">Sisa Credits</th>
+                                  <th className="p-3 text-center">Token Dibuat</th>
+                                  <th className="p-3 text-center">Aksi</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                              {userList.map(user => (
+                                  <tr key={user.id} className="hover:bg-gray-50">
+                                      <td className="p-3">
+                                          <div className="font-bold text-gray-800">{user.displayName || 'No Name'}</div>
+                                          <div className="text-xs text-gray-500">{user.email}</div>
+                                      </td>
+                                      <td className="p-3 text-gray-600">{user.school || '-'}</td>
+                                      <td className="p-3 font-mono text-gray-500">{user.phone || '-'}</td>
+                                      <td className="p-3 text-center">
+                                          <span className={`px-3 py-1 rounded-full font-bold ${user.credits > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                              {user.credits || 0}
+                                          </span>
+                                      </td>
+                                      <td className="p-3 text-center font-bold text-indigo-600">
+                                          {user.generatedTokens ? user.generatedTokens.length : 0}
+                                      </td>
+                                      <td className="p-3 text-center">
+                                          <div className="flex justify-center gap-2">
+                                              <button onClick={() => handleAddCredits(user.id)} className="bg-green-50 text-green-600 p-2 rounded hover:bg-green-100 border border-green-200" title="Top Up Manual">
+                                                  <Coins size={16}/> +
+                                              </button>
+                                              <button onClick={() => handleDeleteUser(user.id)} className="bg-red-50 text-red-600 p-2 rounded hover:bg-red-100 border border-red-200" title="Hapus User">
+                                                  <Trash2 size={16}/>
+                                              </button>
+                                          </div>
+                                      </td>
+                                  </tr>
+                              ))}
+                              {userList.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-gray-400">Belum ada user yang mendaftar.</td></tr>}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
