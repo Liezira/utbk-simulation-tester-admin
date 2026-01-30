@@ -144,7 +144,7 @@ const UTBKAdminApp = () => {
       return rankedTokens;
   };
 
- // --- ACTIONS ---
+  // --- ACTIONS: TOKENS ---
 
   // MANUAL LOAD TOKENS
   const loadTokens = async () => {
@@ -158,6 +158,7 @@ const UTBKAdminApp = () => {
       setTokenList(t);
   };
 
+  // 1. EXPORT EXCEL 
   const handleDownloadExcel = async () => {
     if (!confirm("Download laporan lengkap dalam format Excel?")) return;
     try {
@@ -192,7 +193,7 @@ const UTBKAdminApp = () => {
     }
   }; 
 
-  
+  // 2. IMPORT EXCEL 
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
