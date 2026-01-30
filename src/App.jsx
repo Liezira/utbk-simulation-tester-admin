@@ -8,7 +8,8 @@ import {
 import { db, auth } from './firebase';
 import { 
   doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, 
-  onSnapshot, query, orderBy, deleteField, increment, limit, writeBatch 
+  onSnapshot, query, orderBy, deleteField, increment, limit, 
+  writeBatch, startAfter 
 } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import 'katex/dist/katex.min.css';
@@ -143,25 +144,22 @@ const UTBKAdminApp = () => {
       return rankedTokens;
   };
 
-  // --- ACTIONS: TOKENS ---
+ // --- ACTIONS ---
 
-  // MANUAL LOAD TOKENS (Untuk Tombol Refresh)
+  // MANUAL LOAD TOKENS
   const loadTokens = async () => {
       const q = query(
           collection(db, 'tokens'), 
           orderBy('createdAt', 'desc'), 
           limit(50)
       );
-      
       const s = await getDocs(q);
       const t = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTokenList(t);
   };
 
-  // --- EXPORT DATA (EXCEL) ---
   const handleDownloadExcel = async () => {
     if (!confirm("Download laporan lengkap dalam format Excel?")) return;
-    
     try {
         const q = query(collection(db, 'tokens'), orderBy('createdAt', 'desc'));
         const querySnapshot = await getDocs(q);
@@ -178,19 +176,34 @@ const UTBKAdminApp = () => {
                 "Terkirim Via": d.sentMethod || '-'
             };
         });
-        // --- IMPORT TOKEN MASSAL (EXCEL) ---
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Nilai UTBK");
+
+        const wscols = [{wch: 25}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 20}, {wch: 15}];
+        worksheet['!cols'] = wscols;
+
+        XLSX.writeFile(workbook, `Laporan_UTBK_${new Date().toISOString().slice(0,10)}.xlsx`);
+        alert("✅ Download Berhasil!");
+    } catch (error) {
+        console.error("Gagal export:", error);
+        alert("Gagal mendownload data.");
+    }
+  }; 
+
+  
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!confirm("⚠️ Yakin ingin generate token untuk semua siswa di file ini?\nPastikan format kolom: Nama, Sekolah, HP")) {
-        e.target.value = null; // Reset input file
-        return;
+    if (!confirm("⚠️ Generate token massal?\nFormat: Nama, Sekolah, HP")) {
+        e.target.value = null; return;
     }
 
-    setIsSending(true); // Pakai loading state yang ada
-    
+    setIsSending(true);
     const reader = new FileReader();
+    
     reader.onload = async (evt) => {
         try {
             const bstr = evt.target.result;
@@ -201,59 +214,38 @@ const UTBKAdminApp = () => {
 
             if (data.length === 0) { alert("File kosong!"); setIsSending(false); return; }
 
-            // PROSES BATCHING (Maksimal 500 per batch sesuai aturan Firebase)
-            const batchSize = 450; // Kita set aman di 450
+            // Batching logic
+            const batchSize = 450;
             const chunks = [];
-            
-            for (let i = 0; i < data.length; i += batchSize) {
-                chunks.push(data.slice(i, i + batchSize));
-            }
+            for (let i = 0; i < data.length; i += batchSize) chunks.push(data.slice(i, i + batchSize));
 
             let successCount = 0;
-
-            // Tulis ke Firebase per Chunk
             for (const chunk of chunks) {
-                const batch = import('firebase/firestore').then(mod => mod.writeBatch(db)); // Dynamic import atau gunakan writeBatch(db) jika sudah diimport
-                const batchOp = (await import('firebase/firestore')).writeBatch(db); // Gunakan writeBatch dari import
-
+                const batchOp = writeBatch(db); 
                 chunk.forEach((row) => {
-                    // Pastikan nama kolom di Excel sesuai (Case Insensitive logic sederhana)
                     const nama = row['Nama'] || row['nama'] || row['Name'];
                     const sekolah = row['Sekolah'] || row['sekolah'] || row['School'] || '-';
-                    const hp = row['HP'] || row['hp'] || row['Phone'] || row['No HP'] || '-';
+                    const hp = row['HP'] || row['hp'] || row['Phone'] || '-';
 
                     if (nama) {
                         const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
                         const docRef = doc(db, 'tokens', tokenCode);
-                        
                         batchOp.set(docRef, {
-                            tokenCode,
-                            studentName: nama,
-                            studentSchool: sekolah,
-                            studentPhone: hp,
-                            status: 'active',
-                            createdAt: new Date().toISOString(),
-                            isSent: false,
-                            sentMethod: '-',
-                            score: null,
-                            createdBy: 'ADMIN_BULK'
+                            tokenCode, studentName: nama, studentSchool: sekolah, studentPhone: hp,
+                            status: 'active', createdAt: new Date().toISOString(),
+                            isSent: false, sentMethod: '-', score: null, createdBy: 'ADMIN_BULK'
                         });
                         successCount++;
                     }
                 });
-
-                await batchOp.commit(); // Kirim paket ke server
+                await batchOp.commit();
             }
-
-            alert(`✅ Sukses generate ${successCount} token massal!`);
-            fetchTokens('first'); // Refresh tabel
-            
+            alert(`✅ Sukses generate ${successCount} token!`);
+            fetchTokens('first');
         } catch (error) {
-            console.error("Import Error:", error);
-            alert("Gagal import file Excel. Pastikan formatnya benar.");
+            console.error("Import Error:", error); alert("Gagal import.");
         } finally {
-            setIsSending(false);
-            e.target.value = null; // Reset input agar bisa upload file yang sama lagi
+            setIsSending(false); e.target.value = null;
         }
     };
     reader.readAsBinaryString(file);
