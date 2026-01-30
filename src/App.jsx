@@ -17,9 +17,6 @@ import 'katex/dist/katex.min.css';
 import Latex from 'react-latex-next';
 import * as XLSX from 'xlsx';
 
-// Tambahkan di deretan useState paling atas
-const [isCheckingRole, setIsCheckingRole] = useState(true);
-
 const SUBTESTS = [
   { id: 'pu', name: 'Penalaran Umum', questions: 30 },
   { id: 'ppu', name: 'Pengetahuan & Pemahaman Umum', questions: 20 },
@@ -36,6 +33,8 @@ const FONNTE_TOKEN = import.meta.env.VITE_FONNTE_TOKEN;
 const SEND_DELAY = 3; 
 
 const UTBKAdminApp = () => {
+  // ✅ DIPINDAHKAN: State isCheckingRole ke dalam komponen
+  const [isCheckingRole, setIsCheckingRole] = useState(true);
   const [screen, setScreen] = useState('admin_login'); 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -54,7 +53,7 @@ const UTBKAdminApp = () => {
   
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
 
-  // ✅ DITAMBAHKAN: State untuk pagination
+  // ✅ State untuk pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [isNextAvailable, setIsNextAvailable] = useState(false);
   const [lastVisible, setLastVisible] = useState(null);
@@ -80,36 +79,36 @@ const UTBKAdminApp = () => {
   const [previewData, setPreviewData] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]); 
 
-useEffect(() => {
-  const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-    if (currentUser) {
-      // 1. User login, sekarang cek database
-      setIsCheckingRole(true);
-      try {
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userDocRef);
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+      if (currentUser) {
+        // 1. User login, sekarang cek database
+        setIsCheckingRole(true);
+        try {
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userSnap = await getDoc(userDocRef);
 
-        if (userSnap.exists() && userSnap.data().role === 'admin') {
-          // ✅ LOLOS: Ini Admin
-          setScreen('dashboard');
-        } else {
-          // ❌ DITOLAK: Ini Siswa atau Orang Asing
-          alert("⛔ AKSES DITOLAK: Anda bukan Admin!");
-          await signOut(auth);
+          if (userSnap.exists() && userSnap.data().role === 'admin') {
+            // ✅ LOLOS: Ini Admin
+            setScreen('dashboard');
+          } else {
+            // ❌ DITOLAK: Ini Siswa atau Orang Asing
+            alert("⛔ AKSES DITOLAK: Anda bukan Admin!");
+            await signOut(auth);
+            setScreen('admin_login');
+          }
+        } catch (error) {
+          console.error("Error verifikasi admin:", error);
           setScreen('admin_login');
         }
-      } catch (error) {
-        console.error("Error verifikasi admin:", error);
+      } else {
         setScreen('admin_login');
       }
-    } else {
-      setScreen('admin_login');
-    }
-    setIsCheckingRole(false);
-  });
+      setIsCheckingRole(false);
+    });
 
-  return () => unsubscribe();
-}, []);
+    return () => unsubscribe();
+  }, []);
 
   // --- LOAD DATA REALTIME (TOKENS) ---
   useEffect(() => {
@@ -166,26 +165,26 @@ useEffect(() => {
   }, []);
 
   const handleLogin = async (e) => { 
-  e.preventDefault(); 
-  try { 
-    // 1. Login Authentication
-    const userCredential = await signInWithEmailAndPassword(auth, adminEmail, adminPassword); 
-    const user = userCredential.user;
+    e.preventDefault(); 
+    try { 
+      // 1. Login Authentication
+      const userCredential = await signInWithEmailAndPassword(auth, adminEmail, adminPassword); 
+      const user = userCredential.user;
 
-    // 2. Cek Otorisasi (Role)
-    const userDocRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userDocRef);
+      // 2. Cek Otorisasi (Role)
+      const userDocRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userDocRef);
 
-    if (userSnap.exists() && userSnap.data().role === 'admin') {
-      setScreen('dashboard');
-    } else {
-      throw new Error("Akun ini tidak memiliki izin Admin.");
-    }
-  } catch (error) { 
-    alert('Login Gagal: ' + error.message);
-    await signOut(auth); // Pastikan logout jika gagal role check
-  } 
-};
+      if (userSnap.exists() && userSnap.data().role === 'admin') {
+        setScreen('dashboard');
+      } else {
+        throw new Error("Akun ini tidak memiliki izin Admin.");
+      }
+    } catch (error) { 
+      alert('Login Gagal: ' + error.message);
+      await signOut(auth); // Pastikan logout jika gagal role check
+    } 
+  };
   
   const handleLogout = async () => { 
     await signOut(auth); 
@@ -222,7 +221,7 @@ useEffect(() => {
       return rankedTokens;
   };
 
-  // ✅ DITAMBAHKAN: Fungsi fetchTokens yang hilang
+  // ✅ Fungsi fetchTokens
   const fetchTokens = async (direction) => {
     try {
       let q;
@@ -278,20 +277,7 @@ useEffect(() => {
     }
   };
 
-// --- ACTIONS: TOKENS ---
-
-  // MANUAL LOAD TOKENS (Untuk Tombol Refresh)
-  const loadTokens = async () => {
-      const q = query(
-          collection(db, 'tokens'), 
-          orderBy('createdAt', 'desc'), 
-          limit(50)
-      );
-      
-      const s = await getDocs(q);
-      const t = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTokenList(t);
-  };
+  // --- ACTIONS: TOKENS ---
 
   // 1. EXPORT EXCEL
   const handleDownloadExcel = async () => {
@@ -562,11 +548,7 @@ useEffect(() => {
       else if (type === 'pilihan_majemuk') setCorrectAnswer([]); 
       else if (type === 'isian') setCorrectAnswer(''); 
   };
-  const toggleMajemukAnswer = (opt) => {
-      let current = Array.isArray(correctAnswer) ? [...correctAnswer] : [];
-      if (current.includes(opt)) current = current.filter(x => x !== opt); else current.push(opt);
-      setCorrectAnswer(current);
-  };
+  
   const loadSoalForEdit = (q) => {
       setQuestionText(q.question); setQuestionImage(q.image || ''); setQuestionType(q.type || 'pilihan_ganda'); 
       if (q.type === 'isian') { setOptions(['', '', '', '', '']); setCorrectAnswer(q.correct); } 
@@ -817,15 +799,15 @@ useEffect(() => {
   );
 
   if (isCheckingRole) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="flex flex-col items-center">
-        <Loader2 className="animate-spin text-indigo-600 mb-4" size={40} />
-        <p className="text-gray-500 font-bold">Memverifikasi Hak Akses...</p>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center">
+          <Loader2 className="animate-spin text-indigo-600 mb-4" size={40} />
+          <p className="text-gray-500 font-bold">Memverifikasi Hak Akses...</p>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   if (screen === 'admin_login') {
     return (
