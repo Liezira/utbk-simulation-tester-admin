@@ -8,7 +8,7 @@ import {
 import { db, auth } from './firebase';
 import { 
   doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, 
-  onSnapshot, query, orderBy, deleteField, increment, limit 
+  onSnapshot, query, orderBy, deleteField, increment, limit, writeBatch 
 } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import 'katex/dist/katex.min.css';
@@ -178,7 +178,86 @@ const UTBKAdminApp = () => {
                 "Terkirim Via": d.sentMethod || '-'
             };
         });
+        // --- IMPORT TOKEN MASSAL (EXCEL) ---
+  const handleImportExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
+    if (!confirm("⚠️ Yakin ingin generate token untuk semua siswa di file ini?\nPastikan format kolom: Nama, Sekolah, HP")) {
+        e.target.value = null; // Reset input file
+        return;
+    }
+
+    setIsSending(true); // Pakai loading state yang ada
+    
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        try {
+            const bstr = evt.target.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data = XLSX.utils.sheet_to_json(ws);
+
+            if (data.length === 0) { alert("File kosong!"); setIsSending(false); return; }
+
+            // PROSES BATCHING (Maksimal 500 per batch sesuai aturan Firebase)
+            const batchSize = 450; // Kita set aman di 450
+            const chunks = [];
+            
+            for (let i = 0; i < data.length; i += batchSize) {
+                chunks.push(data.slice(i, i + batchSize));
+            }
+
+            let successCount = 0;
+
+            // Tulis ke Firebase per Chunk
+            for (const chunk of chunks) {
+                const batch = import('firebase/firestore').then(mod => mod.writeBatch(db)); // Dynamic import atau gunakan writeBatch(db) jika sudah diimport
+                const batchOp = (await import('firebase/firestore')).writeBatch(db); // Gunakan writeBatch dari import
+
+                chunk.forEach((row) => {
+                    // Pastikan nama kolom di Excel sesuai (Case Insensitive logic sederhana)
+                    const nama = row['Nama'] || row['nama'] || row['Name'];
+                    const sekolah = row['Sekolah'] || row['sekolah'] || row['School'] || '-';
+                    const hp = row['HP'] || row['hp'] || row['Phone'] || row['No HP'] || '-';
+
+                    if (nama) {
+                        const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+                        const docRef = doc(db, 'tokens', tokenCode);
+                        
+                        batchOp.set(docRef, {
+                            tokenCode,
+                            studentName: nama,
+                            studentSchool: sekolah,
+                            studentPhone: hp,
+                            status: 'active',
+                            createdAt: new Date().toISOString(),
+                            isSent: false,
+                            sentMethod: '-',
+                            score: null,
+                            createdBy: 'ADMIN_BULK'
+                        });
+                        successCount++;
+                    }
+                });
+
+                await batchOp.commit(); // Kirim paket ke server
+            }
+
+            alert(`✅ Sukses generate ${successCount} token massal!`);
+            fetchTokens('first'); // Refresh tabel
+            
+        } catch (error) {
+            console.error("Import Error:", error);
+            alert("Gagal import file Excel. Pastikan formatnya benar.");
+        } finally {
+            setIsSending(false);
+            e.target.value = null; // Reset input agar bisa upload file yang sama lagi
+        }
+    };
+    reader.readAsBinaryString(file);
+  };
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Data Nilai UTBK");
@@ -481,6 +560,27 @@ const UTBKAdminApp = () => {
                     {isSending ? 'Mengirim...' : 'Generate & Kirim'}
                 </button>
               </div>
+              {/* --- SEPARATOR --- */}
+                <div className="relative flex py-2 items-center">
+                    <div className="flex-grow border-t border-gray-200"></div>
+                    <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">ATAU IMPORT EXCEL</span>
+                    <div className="flex-grow border-t border-gray-200"></div>
+                </div>
+
+                {/* --- TOMBOL IMPORT --- */}
+                <div className="relative">
+                    <input 
+                        type="file" 
+                        accept=".xlsx, .xls, .csv" 
+                        onChange={handleImportExcel} 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        disabled={isSending}
+                    />
+                    <button className="w-full py-2 rounded border-2 border-dashed border-indigo-300 text-indigo-600 font-bold hover:bg-indigo-50 flex items-center justify-center gap-2 transition">
+                        <UploadCloud size={18}/> Upload Data Siswa (.xlsx)
+                    </button>
+                </div>
+                <p className="text-[10px] text-gray-400 text-center">Format Kolom: Nama, Sekolah, HP</p>
             </div>
 
             {/* --- KANAN: STATISTIK & TABEL --- */}
@@ -511,8 +611,38 @@ const UTBKAdminApp = () => {
                         <button onClick={handleDownloadExcel} className="flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-green-100 transition">
                             <List size={14}/> Export Excel
                         </button>            
-                        <button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>
-                        {tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}
+                        {/* --- PAGINATION CONTROLS --- */}
+                        <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 border border-gray-200">
+                            <button 
+                                onClick={() => fetchTokens('prev')} 
+                                disabled={currentPage === 1}
+                                className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
+                                title="Halaman Sebelumnya"
+                            >
+                                <ChevronLeft size={16}/>
+                            </button>
+                            <span className="text-xs font-bold px-2 text-gray-600 min-w-[30px] text-center">{currentPage}</span>
+                            <button 
+                                onClick={() => fetchTokens('next')} 
+                                disabled={!isNextAvailable}
+                                className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
+                                title="Halaman Selanjutnya"
+                            >
+                                <ChevronRight size={16}/>
+                            </button>
+                        </div>
+
+                        {/* Refresh (Reset ke Page 1) */}
+                        <button onClick={() => fetchTokens('first')} className="text-indigo-600 hover:bg-indigo-50 p-2 rounded transition" title="Refresh Data (Reset ke Page 1)">
+                            <RefreshCcw size={16}/>
+                        </button>
+
+                        {/* Hapus Semua */}
+                        {tokenList.length > 0 && (
+                            <button onClick={deleteAllTokens} className="text-red-600 bg-red-50 hover:bg-red-100 p-2 rounded transition ml-1" title="Hapus Semua Data">
+                                <Trash2 size={16}/>
+                            </button>
+                        )}
                     </div>
                 </div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
