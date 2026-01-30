@@ -8,11 +8,12 @@ import {
 import { db, auth } from './firebase';
 import { 
   doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, 
-  onSnapshot, query, orderBy, deleteField, increment 
+  onSnapshot, query, orderBy, deleteField, increment, limit 
 } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import 'katex/dist/katex.min.css';
 import Latex from 'react-latex-next';
+import * as XLSX from 'xlsx';
 
 const SUBTESTS = [
   { id: 'pu', name: 'Penalaran Umum', questions: 30 },
@@ -64,7 +65,12 @@ const UTBKAdminApp = () => {
 
   // --- LOAD DATA REALTIME (TOKENS) ---
   useEffect(() => {
-    const q = query(collection(db, 'tokens'), orderBy('createdAt', 'desc'));
+    const q = query(
+        collection(db, 'tokens'), 
+        orderBy('createdAt', 'desc'), 
+        limit(50) 
+    );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const t = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTokenList(t);
@@ -72,10 +78,14 @@ const UTBKAdminApp = () => {
     return () => unsubscribe();
   }, []);
 
-  // --- LOAD DATA REALTIME (USERS) - NEW FITUR ---
+  
   useEffect(() => {
-    // Mengambil data user yang register untuk manajemen credits
-    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+    const q = query(
+        collection(db, 'users'), 
+        orderBy('createdAt', 'desc'),
+        limit(50)
+    );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const u = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setUserList(u);
@@ -137,10 +147,61 @@ const UTBKAdminApp = () => {
 
   // MANUAL LOAD TOKENS (Untuk Tombol Refresh)
   const loadTokens = async () => {
-      const q = query(collection(db, 'tokens'), orderBy('createdAt', 'desc'));
+      const q = query(
+          collection(db, 'tokens'), 
+          orderBy('createdAt', 'desc'), 
+          limit(50)
+      );
+      
       const s = await getDocs(q);
       const t = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTokenList(t);
+  };
+
+  // --- EXPORT DATA (EXCEL) ---
+  const handleDownloadExcel = async () => {
+    if (!confirm("Download laporan lengkap dalam format Excel?")) return;
+    
+    try {
+        const q = query(collection(db, 'tokens'), orderBy('createdAt', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const dataToExport = querySnapshot.docs.map(doc => {
+            const d = doc.data();
+            return {
+                "Nama Siswa": d.studentName,
+                "Asal Sekolah": d.studentSchool || '-',
+                "No WhatsApp": d.studentPhone,
+                "Kode Token": d.tokenCode,
+                "Status": d.status,
+                "Nilai Akhir": d.score !== null ? d.score : "Belum Mengerjakan",
+                "Waktu Selesai": d.finishedAt ? new Date(d.finishedAt).toLocaleString('id-ID') : '-',
+                "Terkirim Via": d.sentMethod || '-'
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Nilai UTBK");
+
+        const wscols = [
+            {wch: 25}, // Nama
+            {wch: 20}, // Sekolah
+            {wch: 15}, // HP
+            {wch: 15}, // Token
+            {wch: 10}, // Status
+            {wch: 10}, // Nilai
+            {wch: 20}, // Waktu
+            {wch: 15}  // Via
+        ];
+        worksheet['!cols'] = wscols;
+
+        XLSX.writeFile(workbook, `Laporan_UTBK_${new Date().toISOString().slice(0,10)}.xlsx`);
+        alert("✅ Download Berhasil!");
+
+    } catch (error) {
+        console.error("Gagal export:", error);
+        alert("Gagal mendownload data.");
+    }
   };
 
   const markAsSent = async (tokenCode, method) => {
@@ -390,7 +451,6 @@ const UTBKAdminApp = () => {
       <div className="max-w-7xl mx-auto p-4 flex-1 w-full">
         {viewMode === 'tokens' ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* --- KIRI: FORM BUAT TOKEN --- */}
             <div className="bg-white p-6 rounded-xl shadow h-fit">
               <h2 className="font-bold mb-4 flex items-center gap-2"><Plus size={18}/> Buat Token</h2>
               
@@ -448,6 +508,9 @@ const UTBKAdminApp = () => {
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="font-bold text-lg">List Token</h2>
                     <div className="flex gap-2">
+                        <button onClick={handleDownloadExcel} className="flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-green-100 transition">
+                            <List size={14}/> Export Excel
+                        </button>            
                         <button onClick={loadTokens} className="text-indigo-600 text-sm">Refresh</button>
                         {tokenList.length>0&&<button onClick={deleteAllTokens} className="text-red-600 text-sm font-bold ml-2">Hapus Semua</button>}
                     </div>
