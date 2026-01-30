@@ -144,21 +144,22 @@ const UTBKAdminApp = () => {
       return rankedTokens;
   };
 
-  // --- ACTIONS: TOKENS ---
+// --- ACTIONS: TOKENS ---
 
-  // MANUAL LOAD TOKENS
+  // MANUAL LOAD TOKENS (Untuk Tombol Refresh)
   const loadTokens = async () => {
       const q = query(
           collection(db, 'tokens'), 
           orderBy('createdAt', 'desc'), 
           limit(50)
       );
+      
       const s = await getDocs(q);
       const t = s.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTokenList(t);
   };
 
-  // 1. EXPORT EXCEL 
+  // 1. EXPORT EXCEL
   const handleDownloadExcel = async () => {
     if (!confirm("Download laporan lengkap dalam format Excel?")) return;
     try {
@@ -191,9 +192,9 @@ const UTBKAdminApp = () => {
         console.error("Gagal export:", error);
         alert("Gagal mendownload data.");
     }
-  }; 
+  };
 
-  // 2. IMPORT EXCEL 
+  // 2. IMPORT EXCEL
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -215,7 +216,6 @@ const UTBKAdminApp = () => {
 
             if (data.length === 0) { alert("File kosong!"); setIsSending(false); return; }
 
-            // Batching logic
             const batchSize = 450;
             const chunks = [];
             for (let i = 0; i < data.length; i += batchSize) chunks.push(data.slice(i, i + batchSize));
@@ -251,36 +251,9 @@ const UTBKAdminApp = () => {
     };
     reader.readAsBinaryString(file);
   };
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Nilai UTBK");
-
-        const wscols = [
-            {wch: 25}, // Nama
-            {wch: 20}, // Sekolah
-            {wch: 15}, // HP
-            {wch: 15}, // Token
-            {wch: 10}, // Status
-            {wch: 10}, // Nilai
-            {wch: 20}, // Waktu
-            {wch: 15}  // Via
-        ];
-        worksheet['!cols'] = wscols;
-
-        XLSX.writeFile(workbook, `Laporan_UTBK_${new Date().toISOString().slice(0,10)}.xlsx`);
-        alert("✅ Download Berhasil!");
-
-    } catch (error) {
-        console.error("Gagal export:", error);
-        alert("Gagal mendownload data.");
-    }
-  };
 
   const markAsSent = async (tokenCode, method) => {
-    try {
-        const tokenRef = doc(db, 'tokens', tokenCode);
-        await updateDoc(tokenRef, { isSent: true, sentMethod: method, sentAt: new Date().toISOString() });
-    } catch (error) { console.error("Gagal update status:", error); }
+    try { const tokenRef = doc(db, 'tokens', tokenCode); await updateDoc(tokenRef, { isSent: true, sentMethod: method, sentAt: new Date().toISOString() }); } catch (error) { console.error(error); }
   };
 
   const sendFonnteMessage = async (name, phone, token) => {
@@ -288,7 +261,7 @@ const UTBKAdminApp = () => {
     setIsSending(true);
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!\nTolong isi feedback dibawah untuk evaluasi kami, terimakasih\nhttps://forms.gle/NDsPSD5vCz3TSbRd8`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
     try {
         const params = new URLSearchParams({ token: FONNTE_TOKEN, target: formattedPhone, message: message, delay: SEND_DELAY, countryCode: '62' });
         await fetch(`https://api.fonnte.com/send?${params.toString()}`, { method: 'GET', mode: 'no-cors' });
@@ -300,7 +273,7 @@ const UTBKAdminApp = () => {
   const sendJsDirect = async (name, phone, token) => {
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!\nTolong isi feedback dibawah untuk evaluasi kami, terimakasih\nhttps://forms.gle/NDsPSD5vCz3TSbRd8`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
     window.location.href = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
     await markAsSent(token, 'JS App (Direct)');
   };
@@ -308,7 +281,7 @@ const UTBKAdminApp = () => {
   const sendManualWeb = async (name, phone, token) => {
     let formattedPhone = phone.toString().replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
-    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!\nTolong isi feedback dibawah untuk evaluasi kami, terimakasih\nhttps://forms.gle/NDsPSD5vCz3TSbRd8`;
+    const message = `Halo *${name}*,\n\nBerikut adalah akses ujian kamu:\n🔑 Token: *${token}*\n🔗 Link: ${STUDENT_APP_URL}\n\n⚠️ *Penting:* Token ini hanya berlaku 1x24 jam.\n\nSelamat mengerjakan!`;
     window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
     await markAsSent(token, 'WA Web (Manual)');
   };
@@ -317,7 +290,6 @@ const UTBKAdminApp = () => {
     if (!newTokenName || !newTokenPhone || !newTokenSchool) { alert('Isi Nama, Sekolah & HP!'); return; } 
     const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     try { 
-        // CreatedBy ADMIN menandakan ini token manual gratis dari admin
         await setDoc(doc(db, 'tokens', tokenCode), { 
             tokenCode, studentName: newTokenName, studentSchool: newTokenSchool, studentPhone: newTokenPhone, status: 'active', createdAt: new Date().toISOString(), isSent: false, sentMethod: '-', score: null, createdBy: 'ADMIN' 
         });
@@ -328,21 +300,22 @@ const UTBKAdminApp = () => {
             else await sendManualWeb(newTokenName, newTokenPhone, tokenCode);
         }
         setNewTokenName(''); setNewTokenPhone(''); setNewTokenSchool('');
+        fetchTokens('first'); // Refresh
     } catch (error) { alert('Gagal generate token.'); }
   };
 
-  const deleteToken = async (code) => { if(confirm('Hapus token ini?')) { await deleteDoc(doc(db, 'tokens', code)); }};
+  const deleteToken = async (code) => { if(confirm('Hapus token ini?')) { await deleteDoc(doc(db, 'tokens', code)); fetchTokens('first'); }};
   
   const resetScore = async (code) => {
       if(confirm('Reset ujian siswa ini? Status akan kembali AKTIF dan nilai dihapus.')) {
           await updateDoc(doc(db, 'tokens', code), {
               status: 'active', score: null, answers: {}, finalTimeLeft: null, createdAt: new Date().toISOString()
           });
+          fetchTokens('first');
       }
   };
 
-  const deleteAllTokens = async () => { if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; try { await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); alert("Semua terhapus."); } catch (error) { alert("Gagal."); } };
-
+  const deleteAllTokens = async () => { if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; try { await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); alert("Semua terhapus."); fetchTokens('first'); } catch (error) { alert("Gagal."); } };
   // --- ACTIONS: USER MANAGEMENT (NEW) ---
   const handleAddCredits = async (userId) => {
       const amount = prompt("Masukkan jumlah credit yang ingin ditambahkan (cth: 5):");
