@@ -4,7 +4,7 @@ import {
   MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
   CheckCircle2, XCircle, RefreshCcw, Trophy, X, Eye, Loader2, UploadCloud, 
   Image as ImageIcon, List, CheckSquare, Type, School, Users, Wallet, Coins,
-  ChevronLeft, ChevronRight  // ✅ DITAMBAHKAN: Import yang hilang
+  ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import { 
@@ -16,6 +16,9 @@ import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import 'katex/dist/katex.min.css';
 import Latex from 'react-latex-next';
 import * as XLSX from 'xlsx';
+
+// Tambahkan di deretan useState paling atas
+const [isCheckingRole, setIsCheckingRole] = useState(true);
 
 const SUBTESTS = [
   { id: 'pu', name: 'Penalaran Umum', questions: 30 },
@@ -77,6 +80,37 @@ const UTBKAdminApp = () => {
   const [previewData, setPreviewData] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]); 
 
+useEffect(() => {
+  const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+    if (currentUser) {
+      // 1. User login, sekarang cek database
+      setIsCheckingRole(true);
+      try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userDocRef);
+
+        if (userSnap.exists() && userSnap.data().role === 'admin') {
+          // ✅ LOLOS: Ini Admin
+          setScreen('dashboard');
+        } else {
+          // ❌ DITOLAK: Ini Siswa atau Orang Asing
+          alert("⛔ AKSES DITOLAK: Anda bukan Admin!");
+          await signOut(auth);
+          setScreen('admin_login');
+        }
+      } catch (error) {
+        console.error("Error verifikasi admin:", error);
+        setScreen('admin_login');
+      }
+    } else {
+      setScreen('admin_login');
+    }
+    setIsCheckingRole(false);
+  });
+
+  return () => unsubscribe();
+}, []);
+
   // --- LOAD DATA REALTIME (TOKENS) ---
   useEffect(() => {
     const q = query(
@@ -132,14 +166,26 @@ const UTBKAdminApp = () => {
   }, []);
 
   const handleLogin = async (e) => { 
-    e.preventDefault(); 
-    try { 
-      await signInWithEmailAndPassword(auth, adminEmail, adminPassword); 
-      setScreen('dashboard'); 
-    } catch (error) { 
-      alert('Login Gagal: ' + error.message); 
-    } 
-  };
+  e.preventDefault(); 
+  try { 
+    // 1. Login Authentication
+    const userCredential = await signInWithEmailAndPassword(auth, adminEmail, adminPassword); 
+    const user = userCredential.user;
+
+    // 2. Cek Otorisasi (Role)
+    const userDocRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userDocRef);
+
+    if (userSnap.exists() && userSnap.data().role === 'admin') {
+      setScreen('dashboard');
+    } else {
+      throw new Error("Akun ini tidak memiliki izin Admin.");
+    }
+  } catch (error) { 
+    alert('Login Gagal: ' + error.message);
+    await signOut(auth); // Pastikan logout jika gagal role check
+  } 
+};
   
   const handleLogout = async () => { 
     await signOut(auth); 
@@ -769,6 +815,17 @@ const UTBKAdminApp = () => {
           </div>
       </div>
   );
+
+  if (isCheckingRole) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex flex-col items-center">
+        <Loader2 className="animate-spin text-indigo-600 mb-4" size={40} />
+        <p className="text-gray-500 font-bold">Memverifikasi Hak Akses...</p>
+      </div>
+    </div>
+  );
+}
 
   if (screen === 'admin_login') {
     return (
