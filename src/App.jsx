@@ -70,7 +70,12 @@ const UTBKAdminApp = () => {
   const [options, setOptions] = useState(['', '', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState('A');
   const [editingId, setEditingId] = useState(null);
-  const [isSending, setIsSending] = useState(false); 
+  const [isSending, setIsSending] = useState(false);
+  
+  // ✅ PREVIEW UPLOAD EXCEL
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewData, setPreviewData] = useState([]);
+  const [selectedRows, setSelectedRows] = useState([]); 
 
   // --- LOAD DATA REALTIME (TOKENS) ---
   useEffect(() => {
@@ -277,16 +282,11 @@ const UTBKAdminApp = () => {
     }
   };
 
-  // 2. IMPORT EXCEL
+  // 2. IMPORT EXCEL (Dengan Preview)
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!confirm("⚠️ Generate token massal?\nFormat: Nama, Sekolah, HP")) {
-        e.target.value = null; return;
-    }
-
-    setIsSending(true);
     const reader = new FileReader();
     
     reader.onload = async (evt) => {
@@ -297,42 +297,91 @@ const UTBKAdminApp = () => {
             const ws = wb.Sheets[wsname];
             const data = XLSX.utils.sheet_to_json(ws);
 
-            if (data.length === 0) { alert("File kosong!"); setIsSending(false); return; }
-
-            const batchSize = 450;
-            const chunks = [];
-            for (let i = 0; i < data.length; i += batchSize) chunks.push(data.slice(i, i + batchSize));
-
-            let successCount = 0;
-            for (const chunk of chunks) {
-                const batchOp = writeBatch(db); 
-                chunk.forEach((row) => {
-                    const nama = row['Nama'] || row['nama'] || row['Name'];
-                    const sekolah = row['Sekolah'] || row['sekolah'] || row['School'] || '-';
-                    const hp = row['HP'] || row['hp'] || row['Phone'] || '-';
-
-                    if (nama) {
-                        const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-                        const docRef = doc(db, 'tokens', tokenCode);
-                        batchOp.set(docRef, {
-                            tokenCode, studentName: nama, studentSchool: sekolah, studentPhone: hp,
-                            status: 'active', createdAt: new Date().toISOString(),
-                            isSent: false, sentMethod: '-', score: null, createdBy: 'ADMIN_BULK'
-                        });
-                        successCount++;
-                    }
-                });
-                await batchOp.commit();
+            if (data.length === 0) { 
+                alert("File kosong!"); 
+                e.target.value = null;
+                return; 
             }
-            alert(`✅ Sukses generate ${successCount} token!`);
-            fetchTokens('first');
+
+            // Parse dan normalisasi data
+            const parsedData = data.map((row, index) => ({
+                id: index,
+                nama: row['Nama'] || row['nama'] || row['Name'] || '',
+                sekolah: row['Sekolah'] || row['sekolah'] || row['School'] || '-',
+                hp: row['HP'] || row['hp'] || row['Phone'] || '-',
+                valid: !!(row['Nama'] || row['nama'] || row['Name'])
+            }));
+
+            // Set preview data dan select semua yang valid
+            setPreviewData(parsedData);
+            setSelectedRows(parsedData.filter(r => r.valid).map(r => r.id));
+            setShowPreviewModal(true);
+            
         } catch (error) {
-            console.error("Import Error:", error); alert("Gagal import.");
+            console.error("Import Error:", error); 
+            alert("Gagal membaca file. Pastikan format Excel benar.");
         } finally {
-            setIsSending(false); e.target.value = null;
+            e.target.value = null;
         }
     };
     reader.readAsBinaryString(file);
+  };
+
+  // Fungsi untuk eksekusi bulk import setelah konfirmasi
+  const executeBulkImport = async () => {
+    if (selectedRows.length === 0) {
+        alert("Tidak ada data yang dipilih!");
+        return;
+    }
+
+    setIsSending(true);
+    setShowPreviewModal(false);
+
+    try {
+        const dataToImport = previewData.filter(row => selectedRows.includes(row.id));
+        const batchSize = 450;
+        const chunks = [];
+        
+        for (let i = 0; i < dataToImport.length; i += batchSize) {
+            chunks.push(dataToImport.slice(i, i + batchSize));
+        }
+
+        let successCount = 0;
+        for (const chunk of chunks) {
+            const batchOp = writeBatch(db);
+            
+            chunk.forEach((row) => {
+                const tokenCode = `UTBK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+                const docRef = doc(db, 'tokens', tokenCode);
+                batchOp.set(docRef, {
+                    tokenCode,
+                    studentName: row.nama,
+                    studentSchool: row.sekolah,
+                    studentPhone: row.hp,
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    isSent: false,
+                    sentMethod: '-',
+                    score: null,
+                    createdBy: 'ADMIN_BULK'
+                });
+                successCount++;
+            });
+            
+            await batchOp.commit();
+        }
+        
+        alert(`✅ Sukses generate ${successCount} token!`);
+        fetchTokens('first');
+        
+    } catch (error) {
+        console.error("Bulk Import Error:", error);
+        alert("Gagal melakukan import massal.");
+    } finally {
+        setIsSending(false);
+        setPreviewData([]);
+        setSelectedRows([]);
+    }
   };
 
   const markAsSent = async (tokenCode, method) => {
@@ -491,6 +540,185 @@ const UTBKAdminApp = () => {
 
   // --- UI COMPONENTS ---
 
+  // Modal Preview Upload Excel
+  const PreviewUploadModal = () => {
+    const toggleRowSelection = (id) => {
+        if (selectedRows.includes(id)) {
+            setSelectedRows(selectedRows.filter(rowId => rowId !== id));
+        } else {
+            setSelectedRows([...selectedRows, id]);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedRows.length === previewData.filter(r => r.valid).length) {
+            setSelectedRows([]);
+        } else {
+            setSelectedRows(previewData.filter(r => r.valid).map(r => r.id));
+        }
+    };
+
+    const validCount = previewData.filter(r => r.valid).length;
+    const invalidCount = previewData.length - validCount;
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+                {/* Header */}
+                <div className="p-6 border-b bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-2xl text-white">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                <Eye size={24}/> Preview Data Excel
+                            </h2>
+                            <p className="text-sm text-indigo-100 mt-1">
+                                Periksa dan pilih data yang akan di-import
+                            </p>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                setShowPreviewModal(false);
+                                setPreviewData([]);
+                                setSelectedRows([]);
+                            }} 
+                            className="hover:bg-white/20 p-2 rounded-full transition"
+                        >
+                            <X size={20}/>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Stats */}
+                <div className="p-4 bg-gray-50 border-b grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-gray-800">{previewData.length}</div>
+                        <div className="text-xs text-gray-500 uppercase">Total Baris</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">{validCount}</div>
+                        <div className="text-xs text-gray-500 uppercase">Valid</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-red-600">{invalidCount}</div>
+                        <div className="text-xs text-gray-500 uppercase">Invalid</div>
+                    </div>
+                </div>
+
+                {/* Table */}
+                <div className="p-6 overflow-y-auto flex-1">
+                    <div className="mb-4 flex justify-between items-center">
+                        <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                            <input
+                                type="checkbox"
+                                checked={selectedRows.length === validCount && validCount > 0}
+                                onChange={toggleSelectAll}
+                                className="w-4 h-4 rounded border-gray-300"
+                            />
+                            <span className="text-sm font-bold text-gray-700">
+                                Pilih Semua Valid ({selectedRows.length} dipilih)
+                            </span>
+                        </label>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-100 text-gray-700 font-bold uppercase text-xs sticky top-0">
+                                <tr>
+                                    <th className="p-3 text-center w-12">#</th>
+                                    <th className="p-3 text-left">Nama Siswa</th>
+                                    <th className="p-3 text-left">Asal Sekolah</th>
+                                    <th className="p-3 text-left">No. WhatsApp</th>
+                                    <th className="p-3 text-center">Status</th>
+                                    <th className="p-3 text-center w-16">Pilih</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {previewData.map((row, index) => (
+                                    <tr 
+                                        key={row.id} 
+                                        className={`hover:bg-gray-50 ${!row.valid ? 'bg-red-50' : ''} ${selectedRows.includes(row.id) ? 'bg-indigo-50' : ''}`}
+                                    >
+                                        <td className="p-3 text-center text-gray-500 font-mono text-xs">
+                                            {index + 1}
+                                        </td>
+                                        <td className="p-3">
+                                            <div className={`font-bold ${row.nama ? 'text-gray-800' : 'text-red-500 italic'}`}>
+                                                {row.nama || '(Kosong)'}
+                                            </div>
+                                        </td>
+                                        <td className="p-3 text-gray-600">
+                                            {row.sekolah}
+                                        </td>
+                                        <td className="p-3 font-mono text-gray-600">
+                                            {row.hp}
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            {row.valid ? (
+                                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">
+                                                    VALID
+                                                </span>
+                                            ) : (
+                                                <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">
+                                                    INVALID
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedRows.includes(row.id)}
+                                                onChange={() => toggleRowSelection(row.id)}
+                                                disabled={!row.valid}
+                                                className="w-4 h-4 rounded border-gray-300 disabled:opacity-30"
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-6 border-t bg-gray-50 flex justify-between items-center gap-4">
+                    <div className="text-sm text-gray-600">
+                        <strong className="text-indigo-600">{selectedRows.length} data</strong> akan di-generate menjadi token
+                    </div>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => {
+                                setShowPreviewModal(false);
+                                setPreviewData([]);
+                                setSelectedRows([]);
+                            }}
+                            className="px-6 py-2 border-2 border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-100 transition"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={executeBulkImport}
+                            disabled={selectedRows.length === 0 || isSending}
+                            className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            {isSending ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin"/>
+                                    Memproses...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle2 size={16}/>
+                                    Generate {selectedRows.length} Token
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+  };
+
   const LeaderboardModal = () => (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
@@ -560,6 +788,9 @@ const UTBKAdminApp = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* MODAL PREVIEW UPLOAD */}
+      {showPreviewModal && <PreviewUploadModal />}
+      
       {/* MODAL LEADERBOARD */}
       {showLeaderboard && <LeaderboardModal />}
 
