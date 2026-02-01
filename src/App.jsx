@@ -4,13 +4,13 @@ import {
   MessageCircle, Send, ExternalLink, Zap, Settings, Radio, Smartphone, 
   CheckCircle2, XCircle, RefreshCcw, Trophy, X, Eye, Loader2, UploadCloud, 
   Image as ImageIcon, List, CheckSquare, Type, School, Users, Wallet, Coins,
-  ChevronLeft, ChevronRight 
+  ChevronLeft, ChevronRight, Search 
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import { 
   doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, 
   onSnapshot, query, orderBy, deleteField, increment, limit, 
-  writeBatch, startAfter 
+  writeBatch, startAfter, where, getCountFromServer 
 } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import 'katex/dist/katex.min.css';
@@ -33,13 +33,11 @@ const FONNTE_TOKEN = import.meta.env.VITE_FONNTE_TOKEN;
 const SEND_DELAY = 3; 
 
 const UTBKAdminApp = () => {
-  // ✅ DIPINDAHKAN: State isCheckingRole ke dalam komponen
   const [isCheckingRole, setIsCheckingRole] = useState(true);
   const [screen, setScreen] = useState('admin_login'); 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   
-  // VIEW MODE: 'tokens' | 'soal' | 'users'
   const [viewMode, setViewMode] = useState('tokens');
   
   const [tokenList, setTokenList] = useState([]);
@@ -53,17 +51,28 @@ const UTBKAdminApp = () => {
   
   const [autoSendMode, setAutoSendMode] = useState('fonnte'); 
 
-  // ✅ State untuk pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [isNextAvailable, setIsNextAvailable] = useState(false);
   const [lastVisible, setLastVisible] = useState(null);
   const [firstVisible, setFirstVisible] = useState(null);
   const [pageHistory, setPageHistory] = useState([]);
 
-  // Leaderboard Modal State
+  // ✅ DITAMBAHKAN: State untuk User Pagination & Search
+  const [userCurrentPage, setUserCurrentPage] = useState(1);
+  const [userIsNextAvailable, setUserIsNextAvailable] = useState(false);
+  const [userLastVisible, setUserLastVisible] = useState(null);
+  const [userFirstVisible, setUserFirstVisible] = useState(null);
+  const [userPageHistory, setUserPageHistory] = useState([]);
+  const [searchEmail, setSearchEmail] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // ✅ DITAMBAHKAN: State untuk Total Count
+  const [totalUsersCount, setTotalUsersCount] = useState(0);
+  const [totalTokensCount, setTotalTokensCount] = useState(0);
+  const [totalCreditsCount, setTotalCreditsCount] = useState(0);
+
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  // Bank Soal States
   const [selectedSubtest, setSelectedSubtest] = useState('pu');
   const [questionType, setQuestionType] = useState('pilihan_ganda'); 
   const [questionText, setQuestionText] = useState('');
@@ -74,7 +83,6 @@ const UTBKAdminApp = () => {
   const [editingId, setEditingId] = useState(null);
   const [isSending, setIsSending] = useState(false);
   
-  // ✅ PREVIEW UPLOAD EXCEL
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewData, setPreviewData] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]); 
@@ -82,17 +90,14 @@ const UTBKAdminApp = () => {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       if (currentUser) {
-        // 1. User login, sekarang cek database
         setIsCheckingRole(true);
         try {
           const userDocRef = doc(db, 'users', currentUser.uid);
           const userSnap = await getDoc(userDocRef);
 
           if (userSnap.exists() && userSnap.data().role === 'admin') {
-            // ✅ LOLOS: Ini Admin
             setScreen('dashboard');
           } else {
-            // ❌ DITOLAK: Ini Siswa atau Orang Asing
             alert("⛔ AKSES DITOLAK: Anda bukan Admin!");
             await signOut(auth);
             setScreen('admin_login');
@@ -122,7 +127,6 @@ const UTBKAdminApp = () => {
       const t = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTokenList(t);
       
-      // Update pagination info
       if (snapshot.docs.length > 0) {
         setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
         setFirstVisible(snapshot.docs[0]);
@@ -133,19 +137,55 @@ const UTBKAdminApp = () => {
   }, []);
 
   
+  // ✅ DIUBAH: Load Users dengan Pagination (LIMIT 20)
   useEffect(() => {
     const q = query(
         collection(db, 'users'), 
         orderBy('createdAt', 'desc'),
-        limit(50)
+        limit(20) // ✅ HEMAT: Hanya ambil 20 user
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const u = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setUserList(u);
+      
+      // Update pagination info untuk users
+      if (snapshot.docs.length > 0) {
+        setUserLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+        setUserFirstVisible(snapshot.docs[0]);
+        setUserIsNextAvailable(snapshot.docs.length === 20);
+      }
     });
     return () => unsubscribe();
   }, []);
+
+  // ✅ DITAMBAHKAN: Load Total Counts (Aggregation)
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        // Total Users
+        const usersCountSnap = await getCountFromServer(collection(db, 'users'));
+        setTotalUsersCount(usersCountSnap.data().count);
+        
+        // Total Tokens
+        const tokensCountSnap = await getCountFromServer(collection(db, 'tokens'));
+        setTotalTokensCount(tokensCountSnap.data().count);
+        
+      } catch (error) {
+        console.error("Error loading counts:", error);
+      }
+    };
+    
+    if (screen === 'dashboard') {
+      loadCounts();
+    }
+  }, [screen]);
+
+  // ✅ DITAMBAHKAN: Hitung Total Credits dari userList yang sudah di-load
+  useEffect(() => {
+    const total = userList.reduce((acc, u) => acc + (u.credits || 0), 0);
+    setTotalCreditsCount(total);
+  }, [userList]);
 
   // --- LOAD BANK SOAL ---
   useEffect(() => {
@@ -167,11 +207,9 @@ const UTBKAdminApp = () => {
   const handleLogin = async (e) => { 
     e.preventDefault(); 
     try { 
-      // 1. Login Authentication
       const userCredential = await signInWithEmailAndPassword(auth, adminEmail, adminPassword); 
       const user = userCredential.user;
 
-      // 2. Cek Otorisasi (Role)
       const userDocRef = doc(db, 'users', user.uid);
       const userSnap = await getDoc(userDocRef);
 
@@ -182,7 +220,7 @@ const UTBKAdminApp = () => {
       }
     } catch (error) { 
       alert('Login Gagal: ' + error.message);
-      await signOut(auth); // Pastikan logout jika gagal role check
+      await signOut(auth);
     } 
   };
   
@@ -191,7 +229,6 @@ const UTBKAdminApp = () => {
     setScreen('admin_login'); 
   };
 
-  // --- HELPER STATUS ---
   const isExpired = (createdAt) => {
       if (!createdAt) return false;
       const createdTime = new Date(createdAt).getTime();
@@ -221,13 +258,11 @@ const UTBKAdminApp = () => {
       return rankedTokens;
   };
 
-  // ✅ Fungsi fetchTokens
   const fetchTokens = async (direction) => {
     try {
       let q;
       
       if (direction === 'first') {
-        // Reset ke halaman pertama
         q = query(
           collection(db, 'tokens'),
           orderBy('createdAt', 'desc'),
@@ -236,7 +271,6 @@ const UTBKAdminApp = () => {
         setCurrentPage(1);
         setPageHistory([]);
       } else if (direction === 'next' && lastVisible) {
-        // Halaman berikutnya
         q = query(
           collection(db, 'tokens'),
           orderBy('createdAt', 'desc'),
@@ -246,7 +280,6 @@ const UTBKAdminApp = () => {
         setPageHistory([...pageHistory, firstVisible]);
         setCurrentPage(currentPage + 1);
       } else if (direction === 'prev' && pageHistory.length > 0) {
-        // Halaman sebelumnya
         const previousFirst = pageHistory[pageHistory.length - 1];
         q = query(
           collection(db, 'tokens'),
@@ -257,7 +290,7 @@ const UTBKAdminApp = () => {
         setPageHistory(pageHistory.slice(0, -1));
         setCurrentPage(currentPage - 1);
       } else {
-        return; // Tidak ada aksi
+        return;
       }
 
       const snapshot = await getDocs(q);
@@ -277,9 +310,97 @@ const UTBKAdminApp = () => {
     }
   };
 
+  // ✅ DITAMBAHKAN: Fetch Users dengan Pagination
+  const fetchUsers = async (direction) => {
+    try {
+      let q;
+      
+      if (direction === 'first') {
+        q = query(
+          collection(db, 'users'),
+          orderBy('createdAt', 'desc'),
+          limit(20)
+        );
+        setUserCurrentPage(1);
+        setUserPageHistory([]);
+      } else if (direction === 'next' && userLastVisible) {
+        q = query(
+          collection(db, 'users'),
+          orderBy('createdAt', 'desc'),
+          startAfter(userLastVisible),
+          limit(20)
+        );
+        setUserPageHistory([...userPageHistory, userFirstVisible]);
+        setUserCurrentPage(userCurrentPage + 1);
+      } else if (direction === 'prev' && userPageHistory.length > 0) {
+        const previousFirst = userPageHistory[userPageHistory.length - 1];
+        q = query(
+          collection(db, 'users'),
+          orderBy('createdAt', 'desc'),
+          startAfter(previousFirst),
+          limit(20)
+        );
+        setUserPageHistory(userPageHistory.slice(0, -1));
+        setUserCurrentPage(userCurrentPage - 1);
+      } else {
+        return;
+      }
+
+      const snapshot = await getDocs(q);
+      const u = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUserList(u);
+      
+      if (snapshot.docs.length > 0) {
+        setUserLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+        setUserFirstVisible(snapshot.docs[0]);
+        setUserIsNextAvailable(snapshot.docs.length === 20);
+      } else {
+        setUserIsNextAvailable(false);
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      alert("Gagal memuat data user");
+    }
+  };
+
+  // ✅ DITAMBAHKAN: Search User by Email
+  const handleSearchUser = async () => {
+    if (!searchEmail.trim()) {
+      fetchUsers('first');
+      return;
+    }
+    
+    setIsSearching(true);
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('email', '==', searchEmail.trim().toLowerCase()),
+        limit(10)
+      );
+      
+      const snapshot = await getDocs(q);
+      const u = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUserList(u);
+      
+      if (u.length === 0) {
+        alert("Tidak ada user dengan email tersebut.");
+      }
+    } catch (error) {
+      console.error("Error searching user:", error);
+      alert("Gagal mencari user");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // ✅ DITAMBAHKAN: Clear Search
+  const handleClearSearch = () => {
+    setSearchEmail('');
+    fetchUsers('first');
+  };
+
   // --- ACTIONS: TOKENS ---
 
-  // 1. EXPORT EXCEL
   const handleDownloadExcel = async () => {
     if (!confirm("Download laporan lengkap dalam format Excel?")) return;
     try {
@@ -314,7 +435,6 @@ const UTBKAdminApp = () => {
     }
   };
 
-  // 2. IMPORT EXCEL (Dengan Preview)
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -335,7 +455,6 @@ const UTBKAdminApp = () => {
                 return; 
             }
 
-            // Parse dan normalisasi data
             const parsedData = data.map((row, index) => ({
                 id: index,
                 nama: row['Nama'] || row['nama'] || row['Name'] || '',
@@ -344,7 +463,6 @@ const UTBKAdminApp = () => {
                 valid: !!(row['Nama'] || row['nama'] || row['Name'])
             }));
 
-            // Set preview data dan select semua yang valid
             setPreviewData(parsedData);
             setSelectedRows(parsedData.filter(r => r.valid).map(r => r.id));
             setShowPreviewModal(true);
@@ -359,7 +477,6 @@ const UTBKAdminApp = () => {
     reader.readAsBinaryString(file);
   };
 
-  // Fungsi untuk eksekusi bulk import setelah konfirmasi
   const executeBulkImport = async () => {
     if (selectedRows.length === 0) {
         alert("Tidak ada data yang dipilih!");
@@ -464,7 +581,7 @@ const UTBKAdminApp = () => {
             else await sendManualWeb(newTokenName, newTokenPhone, tokenCode);
         }
         setNewTokenName(''); setNewTokenPhone(''); setNewTokenSchool('');
-        fetchTokens('first'); // Refresh
+        fetchTokens('first');
     } catch (error) { alert('Gagal generate token.'); }
   };
 
@@ -568,7 +685,6 @@ const UTBKAdminApp = () => {
 
   // --- UI COMPONENTS ---
 
-  // Modal Preview Upload Excel
   const PreviewUploadModal = () => {
     const toggleRowSelection = (id) => {
         if (selectedRows.includes(id)) {
@@ -592,7 +708,6 @@ const UTBKAdminApp = () => {
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
-                {/* Header */}
                 <div className="p-6 border-b bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-2xl text-white">
                     <div className="flex justify-between items-center">
                         <div>
@@ -616,7 +731,6 @@ const UTBKAdminApp = () => {
                     </div>
                 </div>
 
-                {/* Stats */}
                 <div className="p-4 bg-gray-50 border-b grid grid-cols-3 gap-4">
                     <div className="text-center">
                         <div className="text-2xl font-bold text-gray-800">{previewData.length}</div>
@@ -632,7 +746,6 @@ const UTBKAdminApp = () => {
                     </div>
                 </div>
 
-                {/* Table */}
                 <div className="p-6 overflow-y-auto flex-1">
                     <div className="mb-4 flex justify-between items-center">
                         <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
@@ -707,7 +820,6 @@ const UTBKAdminApp = () => {
                     </div>
                 </div>
 
-                {/* Footer Actions */}
                 <div className="p-6 border-t bg-gray-50 flex justify-between items-center gap-4">
                     <div className="text-sm text-gray-600">
                         <strong className="text-indigo-600">{selectedRows.length} data</strong> akan di-generate menjadi token
@@ -827,13 +939,9 @@ const UTBKAdminApp = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* MODAL PREVIEW UPLOAD */}
       {showPreviewModal && <PreviewUploadModal />}
-      
-      {/* MODAL LEADERBOARD */}
       {showLeaderboard && <LeaderboardModal />}
 
-      {/* HEADER */}
       <div className="sticky top-0 z-40 bg-white shadow px-6 py-4 flex justify-between items-center mb-6">
         <h1 className="text-xl font-bold text-indigo-900">Admin Panel</h1>
         <div className="flex gap-2">
@@ -851,7 +959,6 @@ const UTBKAdminApp = () => {
             <div className="bg-white p-6 rounded-xl shadow h-fit">
               <h2 className="font-bold mb-4 flex items-center gap-2"><Plus size={18}/> Buat Token</h2>
               
-              {/* CONFIG MODE */}
               <div className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <p className="text-xs font-bold text-gray-500 mb-2 uppercase flex items-center gap-1"><Settings size={12}/> Metode Kirim Default:</p>
                 <div className="flex flex-col gap-2">
@@ -900,7 +1007,6 @@ const UTBKAdminApp = () => {
               <p className="text-[10px] text-gray-400 text-center">Format Kolom: Nama, Sekolah, HP</p>
             </div>
 
-            {/* --- KANAN: STATISTIK & TABEL --- */}
             <div className="md:col-span-2 space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <button onClick={() => setFilterStatus('all')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
@@ -928,7 +1034,6 @@ const UTBKAdminApp = () => {
                         <button onClick={handleDownloadExcel} className="flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-green-100 transition">
                             <List size={14}/> Export Excel
                         </button>            
-                        {/* --- PAGINATION CONTROLS --- */}
                         <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 border border-gray-200">
                             <button 
                                 onClick={() => fetchTokens('prev')} 
@@ -949,12 +1054,10 @@ const UTBKAdminApp = () => {
                             </button>
                         </div>
 
-                        {/* Refresh (Reset ke Page 1) */}
                         <button onClick={() => fetchTokens('first')} className="text-indigo-600 hover:bg-indigo-50 p-2 rounded transition" title="Refresh Data (Reset ke Page 1)">
                             <RefreshCcw size={16}/>
                         </button>
 
-                        {/* Hapus Semua */}
                         {tokenList.length > 0 && (
                             <button onClick={deleteAllTokens} className="text-red-600 bg-red-50 hover:bg-red-100 p-2 rounded transition ml-1" title="Hapus Semua Data">
                                 <Trash2 size={16}/>
@@ -1035,21 +1138,87 @@ const UTBKAdminApp = () => {
             </div>
           </div>
         ) : viewMode === 'users' ? (
-          // --- TAB USER MANAGEMENT ---
           <div className="space-y-6">
+              {/* ✅ DIUBAH: Menggunakan Count dari Aggregation */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white p-6 rounded-xl shadow border border-indigo-100">
                       <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Users</h3>
-                      <div className="text-3xl font-black text-indigo-900">{userList.length}</div>
+                      <div className="text-3xl font-black text-indigo-900">{totalUsersCount}</div>
+                      <p className="text-xs text-gray-400 mt-1">Ditampilkan: {userList.length} user</p>
                   </div>
                   <div className="bg-white p-6 rounded-xl shadow border border-green-100">
                       <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Credits Beredar</h3>
-                      <div className="text-3xl font-black text-green-600">{userList.reduce((acc, u) => acc + (u.credits || 0), 0)}</div>
+                      <div className="text-3xl font-black text-green-600">{totalCreditsCount}</div>
+                      <p className="text-xs text-gray-400 mt-1">Dari halaman ini</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl shadow border border-blue-100">
+                      <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Tokens</h3>
+                      <div className="text-3xl font-black text-blue-600">{totalTokensCount}</div>
                   </div>
               </div>
 
               <div className="bg-white p-6 rounded-xl shadow">
-                  <h2 className="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2"><Wallet size={20}/> Manajemen Saldo User</h2>
+                  <div className="flex justify-between items-center mb-4">
+                      <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                          <Wallet size={20}/> Manajemen Saldo User
+                      </h2>
+                      
+                      {/* ✅ DITAMBAHKAN: Search Bar */}
+                      <div className="flex gap-2">
+                          <div className="relative">
+                              <input 
+                                  type="email" 
+                                  value={searchEmail} 
+                                  onChange={e => setSearchEmail(e.target.value)}
+                                  onKeyPress={e => e.key === 'Enter' && handleSearchUser()}
+                                  placeholder="Cari email..." 
+                                  className="pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-200 outline-none w-64"
+                              />
+                              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                          </div>
+                          <button 
+                              onClick={handleSearchUser} 
+                              disabled={isSearching}
+                              className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition disabled:bg-gray-400"
+                          >
+                              {isSearching ? 'Mencari...' : 'Cari'}
+                          </button>
+                          {searchEmail && (
+                              <button 
+                                  onClick={handleClearSearch}
+                                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition"
+                              >
+                                  Reset
+                              </button>
+                          )}
+                      </div>
+                  </div>
+
+                  {/* ✅ DITAMBAHKAN: Pagination Controls untuk Users */}
+                  {!searchEmail && (
+                      <div className="flex justify-end mb-4">
+                          <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 border border-gray-200">
+                              <button 
+                                  onClick={() => fetchUsers('prev')} 
+                                  disabled={userCurrentPage === 1}
+                                  className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
+                                  title="Halaman Sebelumnya"
+                              >
+                                  <ChevronLeft size={16}/>
+                              </button>
+                              <span className="text-xs font-bold px-2 text-gray-600 min-w-[30px] text-center">{userCurrentPage}</span>
+                              <button 
+                                  onClick={() => fetchUsers('next')} 
+                                  disabled={!userIsNextAvailable}
+                                  className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
+                                  title="Halaman Selanjutnya"
+                              >
+                                  <ChevronRight size={16}/>
+                              </button>
+                          </div>
+                      </div>
+                  )}
+
                   <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
                           <thead className="bg-gray-50">
