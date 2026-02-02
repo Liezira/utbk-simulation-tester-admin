@@ -952,43 +952,6 @@ const UTBKAdminApp = () => {
           </div>
         </div>
       )}
-
-                <div className="p-6 border-t bg-gray-50 flex justify-between items-center gap-4">
-                    <div className="text-sm text-gray-600">
-                        <strong className="text-indigo-600">{selectedRows.length} data</strong> akan di-generate menjadi token
-                    </div>
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => {
-                                setShowPreviewModal(false);
-                                setPreviewData([]);
-                                setSelectedRows([]);
-                            }}
-                            className="px-6 py-2 border-2 border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-100 transition"
-                        >
-                            Batal
-                        </button>
-                        <button
-                            onClick={executeBulkImport}
-                            disabled={selectedRows.length === 0 || isSending}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
-                        >
-                            {isSending ? (
-                                <>
-                                    <Loader2 size={16} className="animate-spin"/>
-                                    Memproses...
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle2 size={16}/>
-                                    Generate {selectedRows.length} Token
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
     );
   };
 
