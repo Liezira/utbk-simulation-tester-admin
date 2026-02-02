@@ -1031,15 +1031,13 @@ const UTBKAdminApp = () => {
         </div>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* --- MODAL SECTION (DITARUH DI ATAS AGAR Z-INDEX BENAR) --- */}
-      {showPreviewModal && <PreviewUploadModal />}
-      {showLeaderboard && <LeaderboardModal />}
-      
-      {/* MODAL IMPORT SOAL (DIPINDAHKAN KESINI) */}
+    <div className="min-h-screen bg-gray-50 flex flex-col"> 
+        {showPreviewModal && <PreviewUploadModal />}
+        {showLeaderboard && <LeaderboardModal />}
+
       {showSoalImport && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
@@ -1057,7 +1055,7 @@ const UTBKAdminApp = () => {
               <table className="w-full text-sm border-collapse">
                 <thead className="bg-gray-100 sticky top-0">
                   <tr>
-                    <th className="p-2 border">No</th>
+                    {/* ❌ KOLOM NO DIHAPUS */}
                     <th className="p-2 border">Tipe</th>
                     <th className="p-2 border">Pertanyaan</th>
                     <th className="p-2 border">Opsi (A/B/C/D/E)</th>
@@ -1068,7 +1066,6 @@ const UTBKAdminApp = () => {
                 <tbody>
                   {previewSoal.map((s, i) => (
                     <tr key={i} className={s.valid ? "bg-white" : "bg-red-50"}>
-                      <td className="p-2 border text-center">{i+1}</td>
                       <td className="p-2 border text-center uppercase text-xs font-bold">{s.type}</td>
                       <td className="p-2 border truncate max-w-xs">{s.question}</td>
                       <td className="p-2 border text-xs text-gray-500">
