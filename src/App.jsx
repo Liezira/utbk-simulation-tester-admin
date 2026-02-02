@@ -1055,7 +1055,6 @@ const UTBKAdminApp = () => {
               <table className="w-full text-sm border-collapse">
                 <thead className="bg-gray-100 sticky top-0">
                   <tr>
-                    {/* ❌ KOLOM NO DIHAPUS */}
                     <th className="p-2 border">Tipe</th>
                     <th className="p-2 border">Pertanyaan</th>
                     <th className="p-2 border">Opsi (A/B/C/D/E)</th>
