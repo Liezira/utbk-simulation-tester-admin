@@ -86,6 +86,9 @@ const UTBKAdminApp = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewData, setPreviewData] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]); 
+  // STATE UNTUK IMPORT SOAL
+  const [showSoalImport, setShowSoalImport] = useState(false);
+  const [previewSoal, setPreviewSoal] = useState([]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -203,6 +206,85 @@ const UTBKAdminApp = () => {
     };
     loadBankSoal();
   }, []);
+
+  // --- LOGIC IMPORT SOAL ---
+  
+  const handleDownloadTemplateSoal = () => {
+    const data = [
+      {
+        "Tipe (PG/ISIAN)": "PG",
+        "Pertanyaan": "Ibu kota Indonesia adalah...",
+        "Opsi A": "Jakarta", "Opsi B": "Bandung", "Opsi C": "Surabaya", "Opsi D": "Medan", "Opsi E": "Bali",
+        "Kunci Jawaban": "A"
+      },
+      {
+        "Tipe (PG/ISIAN)": "ISIAN",
+        "Pertanyaan": "Berapakah hasil 10 + 10?",
+        "Opsi A": "-", "Opsi B": "-", "Opsi C": "-", "Opsi D": "-", "Opsi E": "-",
+        "Kunci Jawaban": "20"
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template Soal");
+    XLSX.writeFile(wb, "TEMPLATE_BANK_SOAL.xlsx");
+  };
+
+  const handleImportSoalFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target.result, { type: 'binary' });
+        const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        
+        const parsed = data.map((row, idx) => {
+          const type = row["Tipe (PG/ISIAN)"]?.toUpperCase().includes("ISIAN") ? 'isian' : 'pilihan_ganda';
+          const valid = row["Pertanyaan"] && row["Kunci Jawaban"];
+          return {
+            id: Date.now() + idx,
+            type,
+            question: row["Pertanyaan"],
+            options: type === 'isian' ? [] : [
+              row["Opsi A"] || "", row["Opsi B"] || "", row["Opsi C"] || "", row["Opsi D"] || "", row["Opsi E"] || ""
+            ],
+            correct: row["Kunci Jawaban"]?.toString(),
+            image: "", // Import Excel jarang support gambar langsung
+            valid
+          };
+        });
+        setPreviewSoal(parsed);
+        setShowSoalImport(true);
+      } catch (err) {
+        alert("Gagal membaca file excel.");
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null; // Reset input
+  };
+
+  const saveBulkSoal = async () => {
+    if (previewSoal.length === 0) return;
+    if (!confirm(`Import ${previewSoal.length} soal ke ${SUBTESTS.find(s=>s.id===selectedSubtest).name}?`)) return;
+
+    try {
+      const currentQuestions = bankSoal[selectedSubtest] || [];
+      // Filter hanya data valid dan hapus properti 'valid' sebelum simpan
+      const newQuestions = previewSoal.filter(p => p.valid).map(({ valid, ...rest }) => rest);
+      
+      const combined = [...currentQuestions, ...newQuestions];
+      await setDoc(doc(db, 'bank_soal', selectedSubtest), { questions: combined });
+      
+      setBankSoal(prev => ({ ...prev, [selectedSubtest]: combined }));
+      alert("✅ Berhasil import soal!");
+      setShowSoalImport(false);
+      setPreviewSoal([]);
+    } catch (error) {
+      console.error(error);
+      alert("Gagal menyimpan ke database.");
+    }
+  };
 
   const handleLogin = async (e) => { 
     e.preventDefault(); 
@@ -820,6 +902,57 @@ const UTBKAdminApp = () => {
                     </div>
                 </div>
 
+                {showSoalImport && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b bg-indigo-600 text-white rounded-t-2xl flex justify-between">
+              <h2 className="text-xl font-bold flex items-center gap-2"><UploadCloud/> Preview Import Soal</h2>
+              <button onClick={() => setShowSoalImport(false)}><X/></button>
+            </div>
+            
+            <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
+               <div>Target: <span className="font-bold text-indigo-600">{SUBTESTS.find(s=>s.id===selectedSubtest)?.name}</span></div>
+               <div className="text-sm">Total: <b>{previewSoal.length}</b> | Valid: <b className="text-green-600">{previewSoal.filter(s=>s.valid).length}</b></div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              <table className="w-full text-sm border-collapse">
+                <thead className="bg-gray-100 sticky top-0">
+                  <tr>   
+                    <th className="p-2 border">Tipe</th>
+                    <th className="p-2 border">Pertanyaan</th>
+                    <th className="p-2 border">Opsi (A/B/C/D/E)</th>
+                    <th className="p-2 border">Kunci</th>
+                    <th className="p-2 border">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewSoal.map((s, i) => (
+                    <tr key={i} className={s.valid ? "bg-white" : "bg-red-50"}>
+                      <td className="p-2 border text-center">{i+1}</td>
+                      <td className="p-2 border text-center uppercase text-xs font-bold">{s.type}</td>
+                      <td className="p-2 border truncate max-w-xs">{s.question}</td>
+                      <td className="p-2 border text-xs text-gray-500">
+                        {s.type === 'isian' ? '-' : s.options.join(' | ')}
+                      </td>
+                      <td className="p-2 border text-center font-bold">{s.correct}</td>
+                      <td className="p-2 border text-center">
+                        {s.valid ? <CheckCircle2 className="text-green-500 w-5 h-5 mx-auto"/> : <XCircle className="text-red-500 w-5 h-5 mx-auto"/>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-6 border-t flex justify-end gap-3">
+              <button onClick={() => setShowSoalImport(false)} className="px-6 py-2 border rounded">Batal</button>
+              <button onClick={saveBulkSoal} className="px-6 py-2 bg-indigo-600 text-white rounded font-bold hover:bg-indigo-700">Import Sekarang</button>
+            </div>
+          </div>
+        </div>
+      )}
+
                 <div className="p-6 border-t bg-gray-50 flex justify-between items-center gap-4">
                     <div className="text-sm text-gray-600">
                         <strong className="text-indigo-600">{selectedRows.length} data</strong> akan di-generate menjadi token
@@ -1269,7 +1402,18 @@ const UTBKAdminApp = () => {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-               <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2></div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2>
+                  <div className="flex gap-2">
+                    <button onClick={handleDownloadTemplateSoal} className="text-xs bg-green-50 text-green-700 px-3 py-2 rounded border border-green-200 font-bold flex items-center gap-1 hover:bg-green-100">
+                      <List size={14}/> Template Excel
+                    </button>
+                    <label className="text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded border border-blue-200 font-bold flex items-center gap-1 hover:bg-blue-100 cursor-pointer">
+                      <UploadCloud size={14}/> Import Excel
+                      <input type="file" accept=".xlsx" className="hidden" onChange={handleImportSoalFile}/>
+                    </label>
+                  </div>
+               </div>
                <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
                  <select value={selectedSubtest} onChange={e => { setSelectedSubtest(e.target.value); resetForm(); }} className="w-full p-3 border rounded-lg mb-6 bg-white font-medium text-gray-700 shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none">
                      {SUBTESTS.map(s => (<option key={s.id} value={s.id}>{s.name} ({bankSoal[s.id]?.length || 0} / {s.questions})</option>))}
