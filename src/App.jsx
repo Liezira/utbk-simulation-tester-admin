@@ -1953,5 +1953,6 @@ const UTBKAdminApp = () => {
       </div>
     </div>
   );
+};
 
 export default UTBKAdminApp;
