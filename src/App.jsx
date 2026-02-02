@@ -769,241 +769,219 @@ const UTBKAdminApp = () => {
 
   const PreviewUploadModal = () => {
     const toggleRowSelection = (id) => {
-        if (selectedRows.includes(id)) {
-            setSelectedRows(selectedRows.filter(rowId => rowId !== id));
-        } else {
-            setSelectedRows([...selectedRows, id]);
-        }
+      if (selectedRows.includes(id)) {
+        setSelectedRows(selectedRows.filter(rowId => rowId !== id));
+      } else {
+        setSelectedRows([...selectedRows, id]);
+      }
     };
 
     const toggleSelectAll = () => {
-        if (selectedRows.length === previewData.filter(r => r.valid).length) {
-            setSelectedRows([]);
-        } else {
-            setSelectedRows(previewData.filter(r => r.valid).map(r => r.id));
-        }
+      if (selectedRows.length === previewData.filter(r => r.valid).length) {
+        setSelectedRows([]);
+      } else {
+        setSelectedRows(previewData.filter(r => r.valid).map(r => r.id));
+      }
     };
 
     const validCount = previewData.filter(r => r.valid).length;
     const invalidCount = previewData.length - validCount;
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-2xl text-white">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-xl font-bold flex items-center gap-2">
-                                <Eye size={24}/> Preview Data Excel
-                            </h2>
-                            <p className="text-sm text-indigo-100 mt-1">
-                                Periksa dan pilih data yang akan di-import
-                            </p>
-                        </div>
-                        <button 
-                            onClick={() => {
-                                setShowPreviewModal(false);
-                                setPreviewData([]);
-                                setSelectedRows([]);
-                            }} 
-                            className="hover:bg-white/20 p-2 rounded-full transition"
-                        >
-                            <X size={20}/>
-                        </button>
-                    </div>
-                </div>
-
-                <div className="p-4 bg-gray-50 border-b grid grid-cols-3 gap-4">
-                    <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-800">{previewData.length}</div>
-                        <div className="text-xs text-gray-500 uppercase">Total Baris</div>
-                    </div>
-                    <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">{validCount}</div>
-                        <div className="text-xs text-gray-500 uppercase">Valid</div>
-                    </div>
-                    <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">{invalidCount}</div>
-                        <div className="text-xs text-gray-500 uppercase">Invalid</div>
-                    </div>
-                </div>
-
-                <div className="p-6 overflow-y-auto flex-1">
-                    <div className="mb-4 flex justify-between items-center">
-                        <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                            <input
-                                type="checkbox"
-                                checked={selectedRows.length === validCount && validCount > 0}
-                                onChange={toggleSelectAll}
-                                className="w-4 h-4 rounded border-gray-300"
-                            />
-                            <span className="text-sm font-bold text-gray-700">
-                                Pilih Semua Valid ({selectedRows.length} dipilih)
-                            </span>
-                        </label>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-100 text-gray-700 font-bold uppercase text-xs sticky top-0">
-                                <tr>
-                                    <th className="p-3 text-center w-12">#</th>
-                                    <th className="p-3 text-left">Nama Siswa</th>
-                                    <th className="p-3 text-left">Asal Sekolah</th>
-                                    <th className="p-3 text-left">No. WhatsApp</th>
-                                    <th className="p-3 text-center">Status</th>
-                                    <th className="p-3 text-center w-16">Pilih</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {previewData.map((row, index) => (
-                                    <tr 
-                                        key={row.id} 
-                                        className={`hover:bg-gray-50 ${!row.valid ? 'bg-red-50' : ''} ${selectedRows.includes(row.id) ? 'bg-indigo-50' : ''}`}
-                                    >
-                                        <td className="p-3 text-center text-gray-500 font-mono text-xs">
-                                            {index + 1}
-                                        </td>
-                                        <td className="p-3">
-                                            <div className={`font-bold ${row.nama ? 'text-gray-800' : 'text-red-500 italic'}`}>
-                                                {row.nama || '(Kosong)'}
-                                            </div>
-                                        </td>
-                                        <td className="p-3 text-gray-600">
-                                            {row.sekolah}
-                                        </td>
-                                        <td className="p-3 font-mono text-gray-600">
-                                            {row.hp}
-                                        </td>
-                                        <td className="p-3 text-center">
-                                            {row.valid ? (
-                                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">
-                                                    VALID
-                                                </span>
-                                            ) : (
-                                                <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">
-                                                    INVALID
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="p-3 text-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedRows.includes(row.id)}
-                                                onChange={() => toggleRowSelection(row.id)}
-                                                disabled={!row.valid}
-                                                className="w-4 h-4 rounded border-gray-300 disabled:opacity-30"
-                                            />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {showSoalImport && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b bg-indigo-600 text-white rounded-t-2xl flex justify-between">
-              <h2 className="text-xl font-bold flex items-center gap-2"><UploadCloud/> Preview Import Soal</h2>
-              <button onClick={() => setShowSoalImport(false)}><X/></button>
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+          <div className="p-6 border-b bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-2xl text-white">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Eye size={24} /> Preview Data Excel (Siswa)
+                </h2>
+                <p className="text-sm text-indigo-100 mt-1">
+                  Periksa dan pilih data siswa yang akan di-generate tokennya
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPreviewModal(false);
+                  setPreviewData([]);
+                  setSelectedRows([]);
+                }}
+                className="hover:bg-white/20 p-2 rounded-full transition"
+              >
+                <X size={20} />
+              </button>
             </div>
-            
-            <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
-               <div>Target: <span className="font-bold text-indigo-600">{SUBTESTS.find(s=>s.id===selectedSubtest)?.name}</span></div>
-               <div className="text-sm">Total: <b>{previewSoal.length}</b> | Valid: <b className="text-green-600">{previewSoal.filter(s=>s.valid).length}</b></div>
+          </div>
+
+          <div className="p-4 bg-gray-50 border-b grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-800">{previewData.length}</div>
+              <div className="text-xs text-gray-500 uppercase">Total Baris</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{validCount}</div>
+              <div className="text-xs text-gray-500 uppercase">Valid</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600">{invalidCount}</div>
+              <div className="text-xs text-gray-500 uppercase">Invalid</div>
+            </div>
+          </div>
+
+          <div className="p-6 overflow-y-auto flex-1">
+            <div className="mb-4 flex justify-between items-center">
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                <input
+                  type="checkbox"
+                  checked={selectedRows.length === validCount && validCount > 0}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <span className="text-sm font-bold text-gray-700">
+                  Pilih Semua Valid ({selectedRows.length} dipilih)
+                </span>
+              </label>
             </div>
 
-            <div className="flex-1 overflow-auto p-4">
-              <table className="w-full text-sm border-collapse">
-                <thead className="bg-gray-100 sticky top-0">
-                  <tr>   
-                    <th className="p-2 border">Tipe</th>
-                    <th className="p-2 border">Pertanyaan</th>
-                    <th className="p-2 border">Opsi (A/B/C/D/E)</th>
-                    <th className="p-2 border">Kunci</th>
-                    <th className="p-2 border">Status</th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 text-gray-700 font-bold uppercase text-xs sticky top-0">
+                  <tr>
+                    <th className="p-3 text-center w-12">#</th>
+                    <th className="p-3 text-left">Nama Siswa</th>
+                    <th className="p-3 text-left">Asal Sekolah</th>
+                    <th className="p-3 text-left">No. WhatsApp</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-center w-16">Pilih</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {previewSoal.map((s, i) => (
-                    <tr key={i} className={s.valid ? "bg-white" : "bg-red-50"}>
-                      <td className="p-2 border text-center">{i+1}</td>
-                      <td className="p-2 border text-center uppercase text-xs font-bold">{s.type}</td>
-                      <td className="p-2 border truncate max-w-xs">{s.question}</td>
-                      <td className="p-2 border text-xs text-gray-500">
-                        {s.type === 'isian' ? '-' : s.options.join(' | ')}
+                <tbody className="divide-y">
+                  {previewData.map((row, index) => (
+                    <tr
+                      key={row.id}
+                      className={`hover:bg-gray-50 ${!row.valid ? 'bg-red-50' : ''} ${selectedRows.includes(row.id) ? 'bg-indigo-50' : ''}`}
+                    >
+                      <td className="p-3 text-center text-gray-500 font-mono text-xs">
+                        {index + 1}
                       </td>
-                      <td className="p-2 border text-center font-bold">{s.correct}</td>
-                      <td className="p-2 border text-center">
-                        {s.valid ? <CheckCircle2 className="text-green-500 w-5 h-5 mx-auto"/> : <XCircle className="text-red-500 w-5 h-5 mx-auto"/>}
+                      <td className="p-3">
+                        <div className={`font-bold ${row.nama ? 'text-gray-800' : 'text-red-500 italic'}`}>
+                          {row.nama || '(Kosong)'}
+                        </div>
+                      </td>
+                      <td className="p-3 text-gray-600">
+                        {row.sekolah}
+                      </td>
+                      <td className="p-3 font-mono text-gray-600">
+                        {row.hp}
+                      </td>
+                      <td className="p-3 text-center">
+                        {row.valid ? (
+                          <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">VALID</span>
+                        ) : (
+                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">INVALID</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.includes(row.id)}
+                          onChange={() => toggleRowSelection(row.id)}
+                          disabled={!row.valid}
+                          className="w-4 h-4 rounded border-gray-300 disabled:opacity-30"
+                        />
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          </div>
 
-            <div className="p-6 border-t flex justify-end gap-3">
-              <button onClick={() => setShowSoalImport(false)} className="px-6 py-2 border rounded">Batal</button>
-              <button onClick={saveBulkSoal} className="px-6 py-2 bg-indigo-600 text-white rounded font-bold hover:bg-indigo-700">Import Sekarang</button>
-            </div>
+          <div className="p-6 border-t flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowPreviewModal(false);
+                setPreviewData([]);
+                setSelectedRows([]);
+              }}
+              className="px-6 py-2 border rounded"
+            >
+              Batal
+            </button>
+            <button
+              onClick={executeBulkImport}
+              disabled={isSending}
+              className="px-6 py-2 bg-indigo-600 text-white rounded font-bold hover:bg-indigo-700 disabled:bg-gray-400"
+            >
+              {isSending ? 'Proses...' : 'Import Token'}
+            </button>
           </div>
         </div>
-      )}
+      </div>
     );
   };
 
   const LeaderboardModal = () => (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
-              <div className="p-6 border-b flex justify-between items-center bg-indigo-600 rounded-t-2xl text-white">
-                  <h2 className="text-xl font-bold flex items-center gap-2"><Trophy size={24} className="text-yellow-300"/> Leaderboard Peserta</h2>
-                  <button onClick={()=>setShowLeaderboard(false)} className="hover:bg-indigo-700 p-2 rounded-full transition"><X size={20}/></button>
-              </div>
-              <div className="p-6 overflow-y-auto">
-                  <div className="flex justify-end mb-4">
-                      <button onClick={resetLeaderboard} className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-100 transition border border-red-200">
-                          <Trash2 size={16}/> Reset Semua Data Peringkat
-                      </button>
-                  </div>
-                  <table className="w-full text-sm text-left">
-                      <thead className="bg-indigo-50 text-indigo-800 font-bold uppercase text-xs">
-                          <tr>
-                              <th className="p-3 text-center">#</th>
-                              <th className="p-3">Nama Siswa</th>
-                              <th className="p-3">Asal Sekolah</th>
-                              <th className="p-3">Kode Token</th>
-                              <th className="p-3">No. WhatsApp</th>
-                              <th className="p-3 text-center">Score</th>
-                              <th className="p-3 text-center">Sisa Waktu</th>
-                          </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                          {getLeaderboardData().map((t, idx) => (
-                              <tr key={t.tokenCode} className="hover:bg-gray-50">
-                                  <td className="p-3 text-center font-bold">
-                                      {idx===0 ? '🥇' : idx===1 ? '🥈' : idx===2 ? '🥉' : idx+1}
-                                  </td>
-                                  <td className="p-3 font-medium text-gray-800">{t.studentName}</td>
-                                  <td className="p-3 text-gray-600">{t.studentSchool || '-'}</td>
-                                  <td className="p-3 font-mono text-indigo-600 font-bold">{t.tokenCode}</td>
-                                  <td className="p-3 font-mono text-gray-600">{t.studentPhone}</td>
-                                  <td className="p-3 text-center font-bold text-indigo-600 text-lg">{t.score}</td>
-                                  <td className="p-3 text-center font-mono text-gray-500">
-                                      {Math.floor(t.finalTimeLeft/60)}m {t.finalTimeLeft%60}s
-                                  </td>
-                              </tr>
-                          ))}
-                          {getLeaderboardData().length === 0 && (
-                              <tr><td colSpan="7" className="p-8 text-center text-gray-400 italic">Belum ada data nilai peserta.</td></tr>
-                          )}
-                      </tbody>
-                  </table>
-              </div>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
+        <div className="p-6 border-b flex justify-between items-center bg-indigo-600 rounded-t-2xl text-white">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Trophy size={24} className="text-yellow-300" /> Leaderboard Peserta
+          </h2>
+          <button onClick={() => setShowLeaderboard(false)} className="hover:bg-indigo-700 p-2 rounded-full transition">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6 overflow-y-auto">
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={resetLeaderboard}
+              className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-100 transition border border-red-200"
+            >
+              <Trash2 size={16} /> Reset Semua Data Peringkat
+            </button>
           </div>
+          <table className="w-full text-sm text-left">
+            <thead className="bg-indigo-50 text-indigo-800 font-bold uppercase text-xs">
+              <tr>
+                <th className="p-3 text-center">#</th>
+                <th className="p-3">Nama Siswa</th>
+                <th className="p-3">Asal Sekolah</th>
+                <th className="p-3">Kode Token</th>
+                <th className="p-3">No. WhatsApp</th>
+                <th className="p-3 text-center">Score</th>
+                <th className="p-3 text-center">Sisa Waktu</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {getLeaderboardData().map((t, idx) => (
+                <tr key={t.tokenCode} className="hover:bg-gray-50">
+                  <td className="p-3 text-center font-bold">
+                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
+                  </td>
+                  <td className="p-3 font-medium text-gray-800">{t.studentName}</td>
+                  <td className="p-3 text-gray-600">{t.studentSchool || '-'}</td>
+                  <td className="p-3 font-mono text-indigo-600 font-bold">{t.tokenCode}</td>
+                  <td className="p-3 font-mono text-gray-600">{t.studentPhone}</td>
+                  <td className="p-3 text-center font-bold text-indigo-600 text-lg">{t.score}</td>
+                  <td className="p-3 text-center font-mono text-gray-500">
+                    {Math.floor(t.finalTimeLeft / 60)}m {t.finalTimeLeft % 60}s
+                  </td>
+                </tr>
+              ))}
+              {getLeaderboardData().length === 0 && (
+                <tr>
+                  <td colSpan="7" className="p-8 text-center text-gray-400 italic">
+                    Belum ada data nilai peserta.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+    </div>
   );
 
   if (isCheckingRole) {
@@ -1023,32 +1001,58 @@ const UTBKAdminApp = () => {
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
           <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Admin Portal</h2>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full p-3 border rounded" placeholder="Email" required />
-            <input type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full p-3 border rounded" placeholder="Password" required />
-            <button className="w-full bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700">Masuk</button>
+            <input
+              type="email"
+              value={adminEmail}
+              onChange={(e) => setAdminEmail(e.target.value)}
+              className="w-full p-3 border rounded"
+              placeholder="Email"
+              required
+            />
+            <input
+              type="password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              className="w-full p-3 border rounded"
+              placeholder="Password"
+              required
+            />
+            <button className="w-full bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700">
+              Masuk
+            </button>
           </form>
-          <div className="mt-8 text-center text-xs text-gray-400 font-mono">© {new Date().getFullYear()} Liezira</div>
+          <div className="mt-8 text-center text-xs text-gray-400 font-mono">
+            © {new Date().getFullYear()} Liezira
+          </div>
         </div>
       </div>
     );
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col"> 
-        {showPreviewModal && <PreviewUploadModal />}
-        {showLeaderboard && <LeaderboardModal />}
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {showPreviewModal && <PreviewUploadModal />}
+      {showLeaderboard && <LeaderboardModal />}
 
       {showSoalImport && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
             <div className="p-6 border-b bg-indigo-600 text-white rounded-t-2xl flex justify-between">
-              <h2 className="text-xl font-bold flex items-center gap-2"><UploadCloud/> Preview Import Soal</h2>
-              <button onClick={() => setShowSoalImport(false)}><X/></button>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <UploadCloud /> Preview Import Soal
+              </h2>
+              <button onClick={() => setShowSoalImport(false)}>
+                <X />
+              </button>
             </div>
-            
+
             <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
-               <div>Target: <span className="font-bold text-indigo-600">{SUBTESTS.find(s=>s.id===selectedSubtest)?.name}</span></div>
-               <div className="text-sm">Total: <b>{previewSoal.length}</b> | Valid: <b className="text-green-600">{previewSoal.filter(s=>s.valid).length}</b></div>
+              <div>
+                Target: <span className="font-bold text-indigo-600">{SUBTESTS.find((s) => s.id === selectedSubtest)?.name}</span>
+              </div>
+              <div className="text-sm">
+                Total: <b>{previewSoal.length}</b> | Valid: <b className="text-green-600">{previewSoal.filter((s) => s.valid).length}</b>
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto p-4">
@@ -1064,15 +1068,13 @@ const UTBKAdminApp = () => {
                 </thead>
                 <tbody>
                   {previewSoal.map((s, i) => (
-                    <tr key={i} className={s.valid ? "bg-white" : "bg-red-50"}>
+                    <tr key={i} className={s.valid ? 'bg-white' : 'bg-red-50'}>
                       <td className="p-2 border text-center uppercase text-xs font-bold">{s.type}</td>
                       <td className="p-2 border truncate max-w-xs">{s.question}</td>
-                      <td className="p-2 border text-xs text-gray-500">
-                        {s.type === 'isian' ? '-' : s.options.join(' | ')}
-                      </td>
+                      <td className="p-2 border text-xs text-gray-500">{s.type === 'isian' ? '-' : s.options.join(' | ')}</td>
                       <td className="p-2 border text-center font-bold">{s.correct}</td>
                       <td className="p-2 border text-center">
-                        {s.valid ? <CheckCircle2 className="text-green-500 w-5 h-5 mx-auto"/> : <XCircle className="text-red-500 w-5 h-5 mx-auto"/>}
+                        {s.valid ? <CheckCircle2 className="text-green-500 w-5 h-5 mx-auto" /> : <XCircle className="text-red-500 w-5 h-5 mx-auto" />}
                       </td>
                     </tr>
                   ))}
@@ -1081,8 +1083,12 @@ const UTBKAdminApp = () => {
             </div>
 
             <div className="p-6 border-t flex justify-end gap-3">
-              <button onClick={() => setShowSoalImport(false)} className="px-6 py-2 border rounded">Batal</button>
-              <button onClick={saveBulkSoal} className="px-6 py-2 bg-indigo-600 text-white rounded font-bold hover:bg-indigo-700">Import Sekarang</button>
+              <button onClick={() => setShowSoalImport(false)} className="px-6 py-2 border rounded">
+                Batal
+              </button>
+              <button onClick={saveBulkSoal} className="px-6 py-2 bg-indigo-600 text-white rounded font-bold hover:bg-indigo-700">
+                Import Sekarang
+              </button>
             </div>
           </div>
         </div>
@@ -1092,11 +1098,33 @@ const UTBKAdminApp = () => {
       <div className="sticky top-0 z-40 bg-white shadow px-6 py-4 flex justify-between items-center mb-6">
         <h1 className="text-xl font-bold text-indigo-900">Admin Panel</h1>
         <div className="flex gap-2">
-          <button onClick={() => setViewMode('tokens')} className={`px-4 py-2 rounded ${viewMode==='tokens'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Token</button>
-          <button onClick={() => setViewMode('users')} className={`px-4 py-2 rounded flex items-center gap-2 ${viewMode==='users'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}><Users size={16}/> Users & Credits</button>
-          <button onClick={() => setViewMode('soal')} className={`px-4 py-2 rounded ${viewMode==='soal'?'bg-indigo-100 text-indigo-700':'text-gray-600'}`}>Bank Soal</button>
-          <button onClick={() => setShowLeaderboard(true)} className="px-4 py-2 rounded bg-yellow-100 text-yellow-700 font-bold flex items-center gap-2 hover:bg-yellow-200 transition"><Trophy size={16}/> Leaderboard</button>
-          <button onClick={handleLogout} className="text-red-600 px-3"><LogOut size={18}/></button>
+          <button
+            onClick={() => setViewMode('tokens')}
+            className={`px-4 py-2 rounded ${viewMode === 'tokens' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600'}`}
+          >
+            Token
+          </button>
+          <button
+            onClick={() => setViewMode('users')}
+            className={`px-4 py-2 rounded flex items-center gap-2 ${viewMode === 'users' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600'}`}
+          >
+            <Users size={16} /> Users & Credits
+          </button>
+          <button
+            onClick={() => setViewMode('soal')}
+            className={`px-4 py-2 rounded ${viewMode === 'soal' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600'}`}
+          >
+            Bank Soal
+          </button>
+          <button
+            onClick={() => setShowLeaderboard(true)}
+            className="px-4 py-2 rounded bg-yellow-100 text-yellow-700 font-bold flex items-center gap-2 hover:bg-yellow-200 transition"
+          >
+            <Trophy size={16} /> Leaderboard
+          </button>
+          <button onClick={handleLogout} className="text-red-600 px-3">
+            <LogOut size={18} />
+          </button>
         </div>
       </div>
 
@@ -1105,71 +1133,161 @@ const UTBKAdminApp = () => {
           // --- VIEW MODE: TOKENS ---
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-xl shadow h-fit">
-              <h2 className="font-bold mb-4 flex items-center gap-2"><Plus size={18}/> Buat Token</h2>
-              
+              <h2 className="font-bold mb-4 flex items-center gap-2">
+                <Plus size={18} /> Buat Token
+              </h2>
+
               <div className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <p className="text-xs font-bold text-gray-500 mb-2 uppercase flex items-center gap-1"><Settings size={12}/> Metode Kirim Default:</p>
+                <p className="text-xs font-bold text-gray-500 mb-2 uppercase flex items-center gap-1">
+                  <Settings size={12} /> Metode Kirim Default:
+                </p>
                 <div className="flex flex-col gap-2">
-                    <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'fonnte' ? 'bg-green-100 border-green-400 text-green-700 ring-1 ring-green-400' : 'bg-white border-gray-300 text-gray-500'}`}>
-                        <input type="radio" name="sendMode" value="fonnte" checked={autoSendMode === 'fonnte'} onChange={() => setAutoSendMode('fonnte')} className="hidden" />
-                        <Zap size={14} className={autoSendMode==='fonnte' ? "fill-green-600" : ""}/> 1. Auto (Fonnte API)
-                    </label>
-                    <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'manual_web' ? 'bg-blue-100 border-blue-400 text-blue-700 ring-1 ring-blue-400' : 'bg-white border-gray-300 text-gray-500'}`}>
-                        <input type="radio" name="sendMode" value="manual_web" checked={autoSendMode === 'manual_web'} onChange={() => setAutoSendMode('manual_web')} className="hidden" />
-                        <ExternalLink size={14}/> 2. Manual (WA Web)
-                    </label>
-                    <label className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${autoSendMode === 'js_app' ? 'bg-purple-100 border-purple-400 text-purple-700 ring-1 ring-purple-400' : 'bg-white border-gray-300 text-gray-500'}`}>
-                        <input type="radio" name="sendMode" value="js_app" checked={autoSendMode === 'js_app'} onChange={() => setAutoSendMode('js_app')} className="hidden" />
-                        <Smartphone size={14}/> 3. JS Direct (App)
-                    </label>
+                  <label
+                    className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${
+                      autoSendMode === 'fonnte'
+                        ? 'bg-green-100 border-green-400 text-green-700 ring-1 ring-green-400'
+                        : 'bg-white border-gray-300 text-gray-500'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sendMode"
+                      value="fonnte"
+                      checked={autoSendMode === 'fonnte'}
+                      onChange={() => setAutoSendMode('fonnte')}
+                      className="hidden"
+                    />
+                    <Zap size={14} className={autoSendMode === 'fonnte' ? 'fill-green-600' : ''} /> 1. Auto (Fonnte API)
+                  </label>
+                  <label
+                    className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${
+                      autoSendMode === 'manual_web'
+                        ? 'bg-blue-100 border-blue-400 text-blue-700 ring-1 ring-blue-400'
+                        : 'bg-white border-gray-300 text-gray-500'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sendMode"
+                      value="manual_web"
+                      checked={autoSendMode === 'manual_web'}
+                      onChange={() => setAutoSendMode('manual_web')}
+                      className="hidden"
+                    />
+                    <ExternalLink size={14} /> 2. Manual (WA Web)
+                  </label>
+                  <label
+                    className={`cursor-pointer p-2 rounded text-xs font-bold flex items-center gap-2 border ${
+                      autoSendMode === 'js_app'
+                        ? 'bg-purple-100 border-purple-400 text-purple-700 ring-1 ring-purple-400'
+                        : 'bg-white border-gray-300 text-gray-500'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sendMode"
+                      value="js_app"
+                      checked={autoSendMode === 'js_app'}
+                      onChange={() => setAutoSendMode('js_app')}
+                      className="hidden"
+                    />
+                    <Smartphone size={14} /> 3. JS Direct (App)
+                  </label>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <input value={newTokenName} onChange={e=>setNewTokenName(e.target.value)} className="w-full p-2 border rounded" placeholder="Nama Siswa"/>
-                <input value={newTokenSchool} onChange={e=>setNewTokenSchool(e.target.value)} className="w-full p-2 border rounded" placeholder="Asal Sekolah"/>
-                <input value={newTokenPhone} onChange={e=>setNewTokenPhone(e.target.value)} className="w-full p-2 border rounded" placeholder="No WhatsApp (08xxx)"/>
-                <button onClick={createToken} disabled={isSending} className={`w-full py-2 rounded transition text-white font-bold flex items-center justify-center gap-2 ${isSending ? 'bg-gray-400' : autoSendMode === 'fonnte' ? 'bg-green-600 hover:bg-green-700' : autoSendMode === 'js_app' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                    {isSending ? 'Mengirim...' : 'Generate & Kirim'}
+                <input
+                  value={newTokenName}
+                  onChange={(e) => setNewTokenName(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  placeholder="Nama Siswa"
+                />
+                <input
+                  value={newTokenSchool}
+                  onChange={(e) => setNewTokenSchool(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  placeholder="Asal Sekolah"
+                />
+                <input
+                  value={newTokenPhone}
+                  onChange={(e) => setNewTokenPhone(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  placeholder="No WhatsApp (08xxx)"
+                />
+                <button
+                  onClick={createToken}
+                  disabled={isSending}
+                  className={`w-full py-2 rounded transition text-white font-bold flex items-center justify-center gap-2 ${
+                    isSending
+                      ? 'bg-gray-400'
+                      : autoSendMode === 'fonnte'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : autoSendMode === 'js_app'
+                      ? 'bg-purple-600 hover:bg-purple-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  {isSending ? 'Mengirim...' : 'Generate & Kirim'}
                 </button>
               </div>
-              
+
               <div className="relative flex py-2 items-center">
-                  <div className="flex-grow border-t border-gray-200"></div>
-                  <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">ATAU IMPORT EXCEL</span>
-                  <div className="flex-grow border-t border-gray-200"></div>
+                <div className="flex-grow border-t border-gray-200"></div>
+                <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">ATAU IMPORT EXCEL</span>
+                <div className="flex-grow border-t border-gray-200"></div>
               </div>
 
               <div className="relative">
-                  <input 
-                      type="file" 
-                      accept=".xlsx, .xls, .csv" 
-                      onChange={handleImportExcel} 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      disabled={isSending}
-                  />
-                  <button className="w-full py-2 rounded border-2 border-dashed border-indigo-300 text-indigo-600 font-bold hover:bg-indigo-50 flex items-center justify-center gap-2 transition">
-                      <UploadCloud size={18}/> Upload Data Siswa (.xlsx)
-                  </button>
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  onChange={handleImportExcel}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  disabled={isSending}
+                />
+                <button className="w-full py-2 rounded border-2 border-dashed border-indigo-300 text-indigo-600 font-bold hover:bg-indigo-50 flex items-center justify-center gap-2 transition">
+                  <UploadCloud size={18} /> Upload Data Siswa (.xlsx)
+                </button>
               </div>
               <p className="text-[10px] text-gray-400 text-center">Format Kolom: Nama, Sekolah, HP</p>
             </div>
 
             <div className="md:col-span-2 space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <button onClick={() => setFilterStatus('all')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                <button
+                  onClick={() => setFilterStatus('all')}
+                  className={`p-3 rounded-lg border text-center transition ${
+                    filterStatus === 'all' ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
                   <p className="text-xs text-gray-500 uppercase font-bold">Total</p>
                   <p className="text-2xl font-bold text-gray-800">{tokenList.length}</p>
                 </button>
-                <button onClick={() => setFilterStatus('active')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'active' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                <button
+                  onClick={() => setFilterStatus('active')}
+                  className={`p-3 rounded-lg border text-center transition ${
+                    filterStatus === 'active' ? 'bg-green-50 border-green-500 ring-2 ring-green-200' : 'bg-white border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
                   <p className="text-xs text-green-600 uppercase font-bold">Aktif</p>
                   <p className="text-2xl font-bold text-green-700">{activeTokens.length}</p>
                 </button>
-                <button onClick={() => setFilterStatus('used')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'used' ? 'bg-gray-100 border-gray-500 ring-2 ring-gray-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                <button
+                  onClick={() => setFilterStatus('used')}
+                  className={`p-3 rounded-lg border text-center transition ${
+                    filterStatus === 'used' ? 'bg-gray-100 border-gray-500 ring-2 ring-gray-200' : 'bg-white border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
                   <p className="text-xs text-gray-600 uppercase font-bold">Terpakai</p>
                   <p className="text-2xl font-bold text-gray-700">{usedTokens.length}</p>
                 </button>
-                <button onClick={() => setFilterStatus('expired')} className={`p-3 rounded-lg border text-center transition ${filterStatus === 'expired' ? 'bg-red-50 border-red-500 ring-2 ring-red-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                <button
+                  onClick={() => setFilterStatus('expired')}
+                  className={`p-3 rounded-lg border text-center transition ${
+                    filterStatus === 'expired' ? 'bg-red-50 border-red-500 ring-2 ring-red-200' : 'bg-white border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
                   <p className="text-xs text-red-600 uppercase font-bold">Expired</p>
                   <p className="text-2xl font-bold text-red-700">{expiredTokens.length}</p>
                 </button>
@@ -1177,109 +1295,165 @@ const UTBKAdminApp = () => {
 
               <div className="bg-white p-6 rounded-xl shadow">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="font-bold text-lg">List Token</h2>
-                    <div className="flex gap-2">
-                        <button onClick={handleDownloadExcel} className="flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-green-100 transition">
-                            <List size={14}/> Export Excel
-                        </button>            
-                        <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 border border-gray-200">
-                            <button 
-                                onClick={() => fetchTokens('prev')} 
-                                disabled={currentPage === 1}
-                                className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
-                                title="Halaman Sebelumnya"
-                            >
-                                <ChevronLeft size={16}/>
-                            </button>
-                            <span className="text-xs font-bold px-2 text-gray-600 min-w-[30px] text-center">{currentPage}</span>
-                            <button 
-                                onClick={() => fetchTokens('next')} 
-                                disabled={!isNextAvailable}
-                                className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
-                                title="Halaman Selanjutnya"
-                            >
-                                <ChevronRight size={16}/>
-                            </button>
-                        </div>
-
-                        <button onClick={() => fetchTokens('first')} className="text-indigo-600 hover:bg-indigo-50 p-2 rounded transition" title="Refresh Data (Reset ke Page 1)">
-                            <RefreshCcw size={16}/>
-                        </button>
-
-                        {tokenList.length > 0 && (
-                            <button onClick={deleteAllTokens} className="text-red-600 bg-red-50 hover:bg-red-100 p-2 rounded transition ml-1" title="Hapus Semua Data">
-                                <Trash2 size={16}/>
-                            </button>
-                        )}
+                  <h2 className="font-bold text-lg">List Token</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDownloadExcel}
+                      className="flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-green-100 transition"
+                    >
+                      <List size={14} /> Export Excel
+                    </button>
+                    <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 border border-gray-200">
+                      <button
+                        onClick={() => fetchTokens('prev')}
+                        disabled={currentPage === 1}
+                        className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
+                        title="Halaman Sebelumnya"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span className="text-xs font-bold px-2 text-gray-600 min-w-[30px] text-center">{currentPage}</span>
+                      <button
+                        onClick={() => fetchTokens('next')}
+                        disabled={!isNextAvailable}
+                        className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
+                        title="Halaman Selanjutnya"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
                     </div>
+
+                    <button
+                      onClick={() => fetchTokens('first')}
+                      className="text-indigo-600 hover:bg-indigo-50 p-2 rounded transition"
+                      title="Refresh Data (Reset ke Page 1)"
+                    >
+                      <RefreshCcw size={16} />
+                    </button>
+
+                    {tokenList.length > 0 && (
+                      <button
+                        onClick={deleteAllTokens}
+                        className="text-red-600 bg-red-50 hover:bg-red-100 p-2 rounded transition ml-1"
+                        title="Hapus Semua Data"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 sticky top-0">
-                        <tr>
-                            <th className="p-2">Kode</th>
-                            <th className="p-2">Nama & Sekolah</th>
-                            <th className="p-2">Status Token</th>
-                            <th className="p-2">Status Kirim</th> 
-                            <th className="p-2 text-center">Progres & Skor</th>
-                            <th className="p-2 text-center">Kirim Ulang</th> 
-                            <th className="p-2 text-center">Aksi</th>
-                        </tr>
+                      <tr>
+                        <th className="p-2">Kode</th>
+                        <th className="p-2">Nama & Sekolah</th>
+                        <th className="p-2">Status Token</th>
+                        <th className="p-2">Status Kirim</th>
+                        <th className="p-2 text-center">Progres & Skor</th>
+                        <th className="p-2 text-center">Kirim Ulang</th>
+                        <th className="p-2 text-center">Aksi</th>
+                      </tr>
                     </thead>
-                    <tbody>{getFilteredList().map(t => {
+                    <tbody>
+                      {getFilteredList().map((t) => {
                         const expired = isExpired(t.createdAt);
-                        const statusLabel = expired ? 'EXPIRED' : (t.status === 'used' ? 'USED' : 'ACTIVE');
-                        const statusColor = expired ? 'bg-red-100 text-red-700' : (t.status === 'used' ? 'bg-gray-200 text-gray-700' : 'bg-green-100 text-green-700');
+                        const statusLabel = expired ? 'EXPIRED' : t.status === 'used' ? 'USED' : 'ACTIVE';
+                        const statusColor = expired
+                          ? 'bg-red-100 text-red-700'
+                          : t.status === 'used'
+                          ? 'bg-gray-200 text-gray-700'
+                          : 'bg-green-100 text-green-700';
 
                         return (
-                        <tr key={t.tokenCode} className="border-b hover:bg-gray-50">
-                        <td className="p-2 font-mono text-indigo-600 font-bold">{t.tokenCode}</td>
-                        <td className="p-2">
-                            <div className="font-bold text-gray-800">{t.studentName}</div>
-                            <div className="text-xs text-gray-500 flex items-center gap-1"><School size={10}/> {t.studentSchool || '-'}</div>
-                            <div className="text-[10px] text-gray-400">{t.studentPhone}</div>
-                        </td>
-                        <td className="p-2"><span className={`px-2 py-1 rounded text-xs font-bold ${statusColor}`}>{statusLabel}</span></td>
-                        
-                        <td className="p-2">
-                            {t.isSent ? (
+                          <tr key={t.tokenCode} className="border-b hover:bg-gray-50">
+                            <td className="p-2 font-mono text-indigo-600 font-bold">{t.tokenCode}</td>
+                            <td className="p-2">
+                              <div className="font-bold text-gray-800">{t.studentName}</div>
+                              <div className="text-xs text-gray-500 flex items-center gap-1">
+                                <School size={10} /> {t.studentSchool || '-'}
+                              </div>
+                              <div className="text-[10px] text-gray-400">{t.studentPhone}</div>
+                            </td>
+                            <td className="p-2">
+                              <span className={`px-2 py-1 rounded text-xs font-bold ${statusColor}`}>{statusLabel}</span>
+                            </td>
+
+                            <td className="p-2">
+                              {t.isSent ? (
                                 <div className="flex flex-col">
-                                    <span className="flex items-center gap-1 text-green-600 font-bold text-xs"><CheckCircle2 size={12}/> Terkirim</span>
-                                    <span className="text-[10px] text-gray-400">{t.sentMethod}</span>
+                                  <span className="flex items-center gap-1 text-green-600 font-bold text-xs">
+                                    <CheckCircle2 size={12} /> Terkirim
+                                  </span>
+                                  <span className="text-[10px] text-gray-400">{t.sentMethod}</span>
                                 </div>
-                            ) : (
-                                <span className="flex items-center gap-1 text-gray-400 text-xs"><XCircle size={12}/> Belum</span>
-                            )}
-                        </td>
+                              ) : (
+                                <span className="flex items-center gap-1 text-gray-400 text-xs">
+                                  <XCircle size={12} /> Belum
+                                </span>
+                              )}
+                            </td>
 
-                        <td className="p-4 text-center">
-                            <div className="flex flex-col gap-1 items-center">
+                            <td className="p-4 text-center">
+                              <div className="flex flex-col gap-1 items-center">
                                 {t.score !== undefined && t.score !== null ? (
-                                    <>
-                                        <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded w-fit border border-blue-200">SELESAI</span>
-                                        <span className="text-sm font-bold text-gray-800 flex items-center gap-1">🏆 Skor: {t.score}</span>
-                                    </>
+                                  <>
+                                    <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded w-fit border border-blue-200">
+                                      SELESAI
+                                    </span>
+                                    <span className="text-sm font-bold text-gray-800 flex items-center gap-1">🏆 Skor: {t.score}</span>
+                                  </>
                                 ) : (
-                                    <span className="text-gray-400 text-xs font-bold bg-gray-100 px-2 py-1 rounded w-fit">-</span>
+                                  <span className="text-gray-400 text-xs font-bold bg-gray-100 px-2 py-1 rounded w-fit">-</span>
                                 )}
-                            </div>
-                        </td>
-                        
-                        <td className="p-2 flex gap-1 justify-center">
-                            <button onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)} className="bg-green-50 text-green-700 p-1.5 rounded hover:bg-green-100"><Zap size={14}/></button>
-                            <button onClick={() => sendManualWeb(t.studentName, t.studentPhone, t.tokenCode)} className="bg-blue-50 text-blue-700 p-1.5 rounded hover:bg-blue-100"><ExternalLink size={14}/></button>
-                            <button onClick={() => sendJsDirect(t.studentName, t.studentPhone, t.tokenCode)} className="bg-purple-50 text-purple-700 p-1.5 rounded hover:bg-purple-100"><Smartphone size={14}/></button>
-                        </td>
+                              </div>
+                            </td>
 
-                        <td className="p-2 text-center">
-                            <div className="flex gap-2 justify-center">
+                            <td className="p-2 flex gap-1 justify-center">
+                              <button
+                                onClick={() => sendFonnteMessage(t.studentName, t.studentPhone, t.tokenCode)}
+                                className="bg-green-50 text-green-700 p-1.5 rounded hover:bg-green-100"
+                              >
+                                <Zap size={14} />
+                              </button>
+                              <button
+                                onClick={() => sendManualWeb(t.studentName, t.studentPhone, t.tokenCode)}
+                                className="bg-blue-50 text-blue-700 p-1.5 rounded hover:bg-blue-100"
+                              >
+                                <ExternalLink size={14} />
+                              </button>
+                              <button
+                                onClick={() => sendJsDirect(t.studentName, t.studentPhone, t.tokenCode)}
+                                className="bg-purple-50 text-purple-700 p-1.5 rounded hover:bg-purple-100"
+                              >
+                                <Smartphone size={14} />
+                              </button>
+                            </td>
+
+                            <td className="p-2 text-center">
+                              <div className="flex gap-2 justify-center">
                                 {t.status === 'used' && !expired && (
-                                    <button onClick={()=>resetScore(t.tokenCode)} className="text-orange-500 hover:text-orange-700 bg-orange-50 p-2 rounded border border-orange-200" title="Reset Ujian"><RefreshCcw size={16}/></button>
+                                  <button
+                                    onClick={() => resetScore(t.tokenCode)}
+                                    className="text-orange-500 hover:text-orange-700 bg-orange-50 p-2 rounded border border-orange-200"
+                                    title="Reset Ujian"
+                                  >
+                                    <RefreshCcw size={16} />
+                                  </button>
                                 )}
-                                <button onClick={()=>deleteToken(t.tokenCode)} className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded border border-red-200" title="Hapus"><Trash2 size={16}/></button>
-                            </div>
-                        </td>
-                    </tr>)})}</tbody>
+                                <button
+                                  onClick={() => deleteToken(t.tokenCode)}
+                                  className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded border border-red-200"
+                                  title="Hapus"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
                   </table>
                 </div>
               </div>
@@ -1288,242 +1462,490 @@ const UTBKAdminApp = () => {
         ) : viewMode === 'users' ? (
           // --- VIEW MODE: USERS ---
           <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white p-6 rounded-xl shadow border border-indigo-100">
-                      <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Users</h3>
-                      <div className="text-3xl font-black text-indigo-900">{totalUsersCount}</div>
-                      <p className="text-xs text-gray-400 mt-1">Ditampilkan: {userList.length} user</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-xl shadow border border-green-100">
-                      <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Credits Beredar</h3>
-                      <div className="text-3xl font-black text-green-600">{totalCreditsCount}</div>
-                      <p className="text-xs text-gray-400 mt-1">Dari halaman ini</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-xl shadow border border-blue-100">
-                      <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Tokens</h3>
-                      <div className="text-3xl font-black text-blue-600">{totalTokensCount}</div>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-6 rounded-xl shadow border border-indigo-100">
+                <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Users</h3>
+                <div className="text-3xl font-black text-indigo-900">{totalUsersCount}</div>
+                <p className="text-xs text-gray-400 mt-1">Ditampilkan: {userList.length} user</p>
               </div>
+              <div className="bg-white p-6 rounded-xl shadow border border-green-100">
+                <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Credits Beredar</h3>
+                <div className="text-3xl font-black text-green-600">{totalCreditsCount}</div>
+                <p className="text-xs text-gray-400 mt-1">Dari halaman ini</p>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow border border-blue-100">
+                <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Tokens</h3>
+                <div className="text-3xl font-black text-blue-600">{totalTokensCount}</div>
+              </div>
+            </div>
 
-              <div className="bg-white p-6 rounded-xl shadow">
-                  <div className="flex justify-between items-center mb-4">
-                      <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                          <Wallet size={20}/> Manajemen Saldo User
-                      </h2>
-                      
-                      <div className="flex gap-2">
-                          <div className="relative">
-                              <input 
-                                  type="email" 
-                                  value={searchEmail} 
-                                  onChange={e => setSearchEmail(e.target.value)}
-                                  onKeyPress={e => e.key === 'Enter' && handleSearchUser()}
-                                  placeholder="Cari email..." 
-                                  className="pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-200 outline-none w-64"
-                              />
-                              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                          </div>
-                          <button 
-                              onClick={handleSearchUser} 
-                              disabled={isSearching}
-                              className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition disabled:bg-gray-400"
-                          >
-                              {isSearching ? 'Mencari...' : 'Cari'}
-                          </button>
-                          {searchEmail && (
-                              <button 
-                                  onClick={handleClearSearch}
-                                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition"
-                              >
-                                  Reset
-                              </button>
-                          )}
-                      </div>
+            <div className="bg-white p-6 rounded-xl shadow">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                  <Wallet size={20} /> Manajemen Saldo User
+                </h2>
+
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={searchEmail}
+                      onChange={(e) => setSearchEmail(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSearchUser()}
+                      placeholder="Cari email..."
+                      className="pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-200 outline-none w-64"
+                    />
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   </div>
-
-                  {!searchEmail && (
-                      <div className="flex justify-end mb-4">
-                          <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 border border-gray-200">
-                              <button 
-                                  onClick={() => fetchUsers('prev')} 
-                                  disabled={userCurrentPage === 1}
-                                  className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
-                                  title="Halaman Sebelumnya"
-                              >
-                                  <ChevronLeft size={16}/>
-                              </button>
-                              <span className="text-xs font-bold px-2 text-gray-600 min-w-[30px] text-center">{userCurrentPage}</span>
-                              <button 
-                                  onClick={() => fetchUsers('next')} 
-                                  disabled={!userIsNextAvailable}
-                                  className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
-                                  title="Halaman Selanjutnya"
-                              >
-                                  <ChevronRight size={16}/>
-                              </button>
-                          </div>
-                      </div>
+                  <button
+                    onClick={handleSearchUser}
+                    disabled={isSearching}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition disabled:bg-gray-400"
+                  >
+                    {isSearching ? 'Mencari...' : 'Cari'}
+                  </button>
+                  {searchEmail && (
+                    <button
+                      onClick={handleClearSearch}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition"
+                    >
+                      Reset
+                    </button>
                   )}
-
-                  <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
-                          <thead className="bg-gray-50">
-                              <tr>
-                                  <th className="p-3">Nama & Email</th>
-                                  <th className="p-3">Sekolah</th>
-                                  <th className="p-3">HP</th>
-                                  <th className="p-3 text-center">Sisa Credits</th>
-                                  <th className="p-3 text-center">Token Dibuat</th>
-                                  <th className="p-3 text-center">Aksi</th>
-                              </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                              {userList.map(user => (
-                                  <tr key={user.id} className="hover:bg-gray-50">
-                                      <td className="p-3">
-                                          <div className="font-bold text-gray-800">{user.displayName || 'No Name'}</div>
-                                          <div className="text-xs text-gray-500">{user.email}</div>
-                                      </td>
-                                      <td className="p-3 text-gray-600">{user.school || '-'}</td>
-                                      <td className="p-3 font-mono text-gray-500">{user.phone || '-'}</td>
-                                      <td className="p-3 text-center">
-                                          <span className={`px-3 py-1 rounded-full font-bold ${user.credits > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                              {user.credits || 0}
-                                          </span>
-                                      </td>
-                                      <td className="p-3 text-center font-bold text-indigo-600">
-                                          {user.generatedTokens ? user.generatedTokens.length : 0}
-                                      </td>
-                                      <td className="p-3 text-center">
-                                          <div className="flex justify-center gap-2">
-                                              <button onClick={() => handleAddCredits(user.id)} className="bg-green-50 text-green-600 p-2 rounded hover:bg-green-100 border border-green-200" title="Top Up Manual">
-                                                  <Coins size={16}/> +
-                                              </button>
-                                              <button onClick={() => handleDeleteUser(user.id)} className="bg-red-50 text-red-600 p-2 rounded hover:bg-red-100 border border-red-200" title="Hapus User">
-                                                  <Trash2 size={16}/>
-                                              </button>
-                                          </div>
-                                      </td>
-                                  </tr>
-                              ))}
-                              {userList.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-gray-400">Belum ada user yang mendaftar.</td></tr>}
-                          </tbody>
-                      </table>
-                  </div>
+                </div>
               </div>
+
+              {!searchEmail && (
+                <div className="flex justify-end mb-4">
+                  <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 border border-gray-200">
+                    <button
+                      onClick={() => fetchUsers('prev')}
+                      disabled={userCurrentPage === 1}
+                      className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
+                      title="Halaman Sebelumnya"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="text-xs font-bold px-2 text-gray-600 min-w-[30px] text-center">{userCurrentPage}</span>
+                    <button
+                      onClick={() => fetchUsers('next')}
+                      disabled={!userIsNextAvailable}
+                      className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
+                      title="Halaman Selanjutnya"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="p-3">Nama & Email</th>
+                      <th className="p-3">Sekolah</th>
+                      <th className="p-3">HP</th>
+                      <th className="p-3 text-center">Sisa Credits</th>
+                      <th className="p-3 text-center">Token Dibuat</th>
+                      <th className="p-3 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {userList.map((user) => (
+                      <tr key={user.id} className="hover:bg-gray-50">
+                        <td className="p-3">
+                          <div className="font-bold text-gray-800">{user.displayName || 'No Name'}</div>
+                          <div className="text-xs text-gray-500">{user.email}</div>
+                        </td>
+                        <td className="p-3 text-gray-600">{user.school || '-'}</td>
+                        <td className="p-3 font-mono text-gray-500">{user.phone || '-'}</td>
+                        <td className="p-3 text-center">
+                          <span
+                            className={`px-3 py-1 rounded-full font-bold ${
+                              user.credits > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {user.credits || 0}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center font-bold text-indigo-600">
+                          {user.generatedTokens ? user.generatedTokens.length : 0}
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="flex justify-center gap-2">
+                            <button
+                              onClick={() => handleAddCredits(user.id)}
+                              className="bg-green-50 text-green-600 p-2 rounded hover:bg-green-100 border border-green-200"
+                              title="Top Up Manual"
+                            >
+                              <Coins size={16} /> +
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="bg-red-50 text-red-600 p-2 rounded hover:bg-red-100 border border-red-200"
+                              title="Hapus User"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {userList.length === 0 && (
+                      <tr>
+                        <td colSpan="6" className="p-8 text-center text-gray-400">
+                          Belum ada user yang mendaftar.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         ) : (
           // --- VIEW MODE: BANK SOAL ---
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2>
-                  <div className="flex gap-2">
-                    <button onClick={handleDownloadTemplateSoal} className="text-xs bg-green-50 text-green-700 px-3 py-2 rounded border border-green-200 font-bold flex items-center gap-1 hover:bg-green-100">
-                      <List size={14}/> Template Excel
-                    </button>
-                    <label className="text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded border border-blue-200 font-bold flex items-center gap-1 hover:bg-blue-100 cursor-pointer">
-                      <UploadCloud size={14}/> Import Excel
-                      <input type="file" accept=".xlsx" className="hidden" onChange={handleImportSoalFile}/>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Editor Bank Soal</h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDownloadTemplateSoal}
+                    className="text-xs bg-green-50 text-green-700 px-3 py-2 rounded border border-green-200 font-bold flex items-center gap-1 hover:bg-green-100"
+                  >
+                    <List size={14} /> Template Excel
+                  </button>
+                  <label className="text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded border border-blue-200 font-bold flex items-center gap-1 hover:bg-blue-100 cursor-pointer">
+                    <UploadCloud size={14} /> Import Excel
+                    <input type="file" accept=".xlsx" className="hidden" onChange={handleImportSoalFile} />
+                  </label>
+                </div>
+              </div>
+              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
+                <select
+                  value={selectedSubtest}
+                  onChange={(e) => {
+                    setSelectedSubtest(e.target.value);
+                    resetForm();
+                  }}
+                  className="w-full p-3 border rounded-lg mb-6 bg-white font-medium text-gray-700 shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none"
+                >
+                  {SUBTESTS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({bankSoal[s.id]?.length || 0} / {s.questions})
+                    </option>
+                  ))}
+                </select>
+
+                <div className="mb-6">
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Format Soal:</label>
+                  <div className="flex flex-wrap gap-2">
+                    <label
+                      className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${
+                        questionType === 'pilihan_ganda'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="qType"
+                        className="hidden"
+                        checked={questionType === 'pilihan_ganda'}
+                        onChange={() => setQuestionType('pilihan_ganda')}
+                      />
+                      <List size={18} /> Pilihan Ganda
+                    </label>
+                    <label
+                      className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${
+                        questionType === 'pilihan_majemuk'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="qType"
+                        className="hidden"
+                        checked={questionType === 'pilihan_majemuk'}
+                        onChange={() => setQuestionType('pilihan_majemuk')}
+                      />
+                      <CheckSquare size={18} /> Pilihan Majemuk
+                    </label>
+                    <label
+                      className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${
+                        questionType === 'isian'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="qType"
+                        className="hidden"
+                        checked={questionType === 'isian'}
+                        onChange={() => setQuestionType('isian')}
+                      />
+                      <Type size={18} /> Isian Singkat
                     </label>
                   </div>
-               </div>
-               <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
-                 <select value={selectedSubtest} onChange={e => { setSelectedSubtest(e.target.value); resetForm(); }} className="w-full p-3 border rounded-lg mb-6 bg-white font-medium text-gray-700 shadow-sm focus:ring-2 focus:ring-indigo-200 outline-none">
-                     {SUBTESTS.map(s => (<option key={s.id} value={s.id}>{s.name} ({bankSoal[s.id]?.length || 0} / {s.questions})</option>))}
-                 </select>
-                 
-                 <div className="mb-6"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Format Soal:</label><div className="flex flex-wrap gap-2">
-                      <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'pilihan_ganda' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'pilihan_ganda'} onChange={() => setQuestionType('pilihan_ganda')} /><List size={18}/> Pilihan Ganda</label>
-                      <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'pilihan_majemuk' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'pilihan_majemuk'} onChange={() => setQuestionType('pilihan_majemuk')} /><CheckSquare size={18}/> Pilihan Majemuk</label>
-                      <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 border-2 transition ${questionType === 'isian' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><input type="radio" name="qType" className="hidden" checked={questionType === 'isian'} onChange={() => setQuestionType('isian')} /><Type size={18}/> Isian Singkat</label>
-                 </div></div>
+                </div>
 
-                 <textarea value={questionText} onChange={e => setQuestionText(e.target.value)} className="w-full p-4 border rounded-lg mb-4 focus:ring-2 focus:ring-indigo-100 outline-none" rows="3" placeholder="Ketik Pertanyaan di sini (Support LaTeX dengan $...$)..." />
-                 
-                 <div className="mb-6">
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Gambar Soal (Opsional):</label>
-                    
-                    {!questionImage ? (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition cursor-pointer relative">
-                            <input type="file" accept="image/*" onChange={handleImageUpload} disabled={isUploading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
-                            {isUploading ? (
-                                <div className="flex flex-col items-center text-indigo-600 animate-pulse"><Loader2 size={32} className="animate-spin mb-2"/><span className="text-sm font-bold">Sedang Memproses...</span></div>
-                            ) : (
-                                <div className="flex flex-col items-center text-gray-400"><UploadCloud size={32} className="mb-2"/><span className="text-sm font-medium text-gray-500">Klik untuk Upload Gambar</span><span className="text-xs text-gray-400 mt-1">Max 1MB (Langsung Simpan)</span></div>
-                            )}
+                <textarea
+                  value={questionText}
+                  onChange={(e) => setQuestionText(e.target.value)}
+                  className="w-full p-4 border rounded-lg mb-4 focus:ring-2 focus:ring-indigo-100 outline-none"
+                  rows="3"
+                  placeholder="Ketik Pertanyaan di sini (Support LaTeX dengan $...$)..."
+                />
+
+                <div className="mb-6">
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Gambar Soal (Opsional):</label>
+
+                  {!questionImage ? (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition cursor-pointer relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={isUploading}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      {isUploading ? (
+                        <div className="flex flex-col items-center text-indigo-600 animate-pulse">
+                          <Loader2 size={32} className="animate-spin mb-2" />
+                          <span className="text-sm font-bold">Sedang Memproses...</span>
                         </div>
+                      ) : (
+                        <div className="flex flex-col items-center text-gray-400">
+                          <UploadCloud size={32} className="mb-2" />
+                          <span className="text-sm font-medium text-gray-500">Klik untuk Upload Gambar</span>
+                          <span className="text-xs text-gray-400 mt-1">Max 1MB (Langsung Simpan)</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="relative w-fit group">
+                      <img src={questionImage} alt="Preview Soal" className="max-h-48 rounded-lg border border-gray-200 shadow-sm" />
+                      <button
+                        onClick={() => setQuestionImage('')}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition transform hover:scale-110"
+                        title="Hapus Gambar"
+                      >
+                        <X size={16} />
+                      </button>
+                      <div className="mt-2 text-xs text-green-600 font-bold flex items-center gap-1">
+                        <CheckCircle2 size={12} /> Gambar Siap Disimpan
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {questionType !== 'isian' ? (
+                  <>
+                    <div className="space-y-3 mb-6">
+                      {options.map((o, i) => (
+                        <div key={i} className="flex gap-3 items-center">
+                          <span className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-100 font-bold rounded-lg text-indigo-700">
+                            {['A', 'B', 'C', 'D', 'E'][i]}
+                          </span>
+                          <input
+                            value={o}
+                            onChange={(e) => {
+                              const n = [...options];
+                              n[i] = e.target.value;
+                              setOptions(n);
+                            }}
+                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none"
+                            placeholder={`Pilihan Jawaban ${['A', 'B', 'C', 'D', 'E'][i]}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mb-4">
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">
+                        Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):
+                      </label>
+                      <div className="flex gap-3">
+                        {['A', 'B', 'C', 'D', 'E'].map((l) => {
+                          const isSelected =
+                            questionType === 'pilihan_ganda'
+                              ? correctAnswer === l
+                              : Array.isArray(correctAnswer) && correctAnswer.includes(l);
+                          return (
+                            <button
+                              key={l}
+                              onClick={() => {
+                                if (questionType === 'pilihan_ganda') setCorrectAnswer(l);
+                                else {
+                                  let current = Array.isArray(correctAnswer) ? [...correctAnswer] : [];
+                                  if (current.includes(l)) current = current.filter((x) => x !== l);
+                                  else current.push(l);
+                                  setCorrectAnswer(current);
+                                }
+                              }}
+                              className={`flex-1 py-3 border-2 rounded-lg font-bold transition text-lg ${
+                                isSelected
+                                  ? 'bg-green-50 text-white border-green-500 shadow-md'
+                                  : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'
+                              }`}
+                            >
+                              {l}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200">
+                    <label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1">
+                      <Key size={14} /> Kunci Jawaban (Teks/Angka):
+                    </label>
+                    <input
+                      value={correctAnswer}
+                      onChange={(e) => setCorrectAnswer(e.target.value)}
+                      className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100"
+                      placeholder="Contoh: 25 atau Jakarta"
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={addOrUpdate}
+                    className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5"
+                  >
+                    {editingId ? 'Simpan Perubahan' : 'Tambah Soal Baru'}
+                  </button>
+                  {editingId && (
+                    <button
+                      onClick={resetForm}
+                      className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100"
+                    >
+                      Batal Edit
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                {(bankSoal[selectedSubtest] || []).map((q, i) => (
+                  <div
+                    key={q.id}
+                    className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"
+                  >
+                    <div className="flex-1 pr-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i + 1}</span>
+                        <span
+                          className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${
+                            q.type === 'isian'
+                              ? 'bg-green-50 text-green-600 border-green-100'
+                              : q.type === 'pilihan_majemuk'
+                              ? 'bg-orange-50 text-orange-600 border-orange-100'
+                              : 'bg-gray-100 text-gray-500 border-gray-200'
+                          }`}
+                        >
+                          {q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}
+                        </span>
+                      </div>
+                      <p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p>
+                      {q.image && (
+                        <div className="mt-2 text-xs text-blue-500 flex items-center gap-1">
+                          <ImageIcon size={12} /> Ada Gambar
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => loadSoalForEdit(q)}
+                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button
+                        onClick={() => deleteSoal(q.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="lg:sticky lg:top-24 h-fit">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                  <span className="font-bold text-gray-700 bg-white border border-gray-200 px-3 py-1 rounded text-sm flex items-center gap-2">
+                    <Eye size={16} className="text-indigo-500" /> Pratinjau Soal (Tampilan Siswa)
+                  </span>
+                  <span className="text-xs font-bold px-2 py-1 rounded border bg-indigo-50 text-indigo-600 border-indigo-100 uppercase">
+                    {questionType.replace('_', ' ')}
+                  </span>
+                </div>
+
+                <div className="p-5">
+                  <div className="text-gray-800 text-sm leading-relaxed font-medium mb-4 text-left text-justify whitespace-pre-wrap">
+                    <Latex>{(questionText || 'Belum ada pertanyaan...').replace(/</g, ' < ')}</Latex>
+                  </div>
+                  {questionImage && <img src={questionImage} className="w-full h-auto my-6 select-none object-contain" alt="Soal" />}
+
+                  <div className="space-y-2 text-sm">
+                    {questionType === 'isian' ? (
+                      <div className="bg-gray-50 p-4 rounded-lg border-2 border-dashed border-gray-300 opacity-70">
+                        <input
+                          disabled
+                          className="w-full p-2 bg-transparent text-xl font-mono border-b-2 border-gray-300 outline-none"
+                          placeholder="Jawaban siswa..."
+                        />
+                      </div>
                     ) : (
-                        <div className="relative w-fit group">
-                            <img src={questionImage} alt="Preview Soal" className="max-h-48 rounded-lg border border-gray-200 shadow-sm" />
-                            <button onClick={() => setQuestionImage('')} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition transform hover:scale-110" title="Hapus Gambar"><X size={16} /></button>
-                            <div className="mt-2 text-xs text-green-600 font-bold flex items-center gap-1"><CheckCircle2 size={12}/> Gambar Siap Disimpan</div>
-                        </div>
+                      <div className="space-y-2">
+                        {options.map((opt, i) => {
+                          const label = ['A', 'B', 'C', 'D', 'E'][i];
+                          const isCorrect =
+                            questionType === 'pilihan_ganda'
+                              ? correctAnswer === label
+                              : Array.isArray(correctAnswer) && correctAnswer.includes(label);
+                          return (
+                            <div
+                              key={i}
+                              className={`p-3 rounded-lg border flex gap-3 items-center ${
+                                isCorrect ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
+                              }`}
+                            >
+                              <div
+                                className={`w-6 h-6 flex items-center justify-center font-bold rounded text-xs ${
+                                  isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'
+                                }`}
+                              >
+                                {label}
+                              </div>
+                              <div className="font-medium text-gray-700">
+                                <Latex>{(opt || `Pilihan ${label}`).replace(/</g, ' < ')}</Latex>
+                              </div>
+                              {isCorrect && <CheckCircle2 size={16} className="text-green-500 ml-auto" />}
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
-                 </div>
-
-                 {questionType !== 'isian' ? (<>
-                       <div className="space-y-3 mb-6">{options.map((o, i) => (<div key={i} className="flex gap-3 items-center"><span className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-100 font-bold rounded-lg text-indigo-700">{['A','B','C','D','E'][i]}</span><input value={o} onChange={e => {const n=[...options];n[i]=e.target.value;setOptions(n)}} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none" placeholder={`Pilihan Jawaban ${['A','B','C','D','E'][i]}`} /></div>))}</div>
-                       <div className="mb-4"><label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-wider">Kunci Jawaban Benar ({questionType === 'pilihan_ganda' ? 'Pilih Satu' : 'Pilih Banyak'}):</label><div className="flex gap-3">{['A','B','C','D','E'].map(l => {const isSelected = questionType === 'pilihan_ganda' ? correctAnswer === l : (Array.isArray(correctAnswer) && correctAnswer.includes(l)); return (<button key={l} onClick={() => { if (questionType === 'pilihan_ganda') setCorrectAnswer(l); else { let current = Array.isArray(correctAnswer) ? [...correctAnswer] : []; if(current.includes(l)) current = current.filter(x=>x!==l); else current.push(l); setCorrectAnswer(current); } }} className={`flex-1 py-3 border-2 rounded-lg font-bold transition text-lg ${isSelected ? 'bg-green-50 text-white border-green-500 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>{l}</button>);})}</div></div></>) : (<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200"><label className="text-xs font-bold text-green-700 uppercase mb-2 block tracking-wider flex items-center gap-1"><Key size={14}/> Kunci Jawaban (Teks/Angka):</label><input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)} className="w-full p-4 border-2 border-green-400 rounded-lg bg-white font-bold text-xl text-gray-800 focus:outline-none focus:ring-4 focus:ring-green-100" placeholder="Contoh: 25 atau Jakarta" /></div>)}
-                 
-                 <div className="flex gap-3 pt-4 border-t border-gray-200"><button onClick={addOrUpdate} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5">{editingId ? 'Simpan Perubahan' : 'Tambah Soal Baru'}</button>{editingId && <button onClick={resetForm} className="px-6 border-2 border-gray-300 py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-100">Batal Edit</button>}</div>
-               </div>
-               
-               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">{(bankSoal[selectedSubtest]||[]).map((q, i) => (<div key={q.id} className="p-4 border rounded-xl flex justify-between items-start bg-white hover:shadow-md transition group"><div className="flex-1 pr-4"><div className="flex items-center gap-2 mb-2"><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-sm">#{i+1}</span><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${q.type==='isian'?'bg-green-50 text-green-600 border-green-100':q.type==='pilihan_majemuk'?'bg-orange-50 text-orange-600 border-orange-100':'bg-gray-100 text-gray-500 border-gray-200'}`}>{q.type ? q.type.replace('_', ' ') : 'PILIHAN GANDA'}</span></div><p className="line-clamp-2 text-gray-700 text-sm font-medium">{q.question}</p>{q.image && <div className="mt-2 text-xs text-blue-500 flex items-center gap-1"><ImageIcon size={12}/> Ada Gambar</div>}</div><div className="flex gap-2"><button onClick={() => loadSoalForEdit(q)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"><Edit size={18}/></button><button onClick={() => deleteSoal(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
-             </div>
-
-             <div className="lg:sticky lg:top-24 h-fit">
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                        <span className="font-bold text-gray-700 bg-white border border-gray-200 px-3 py-1 rounded text-sm flex items-center gap-2">
-                            <Eye size={16} className="text-indigo-500"/> Pratinjau Soal (Tampilan Siswa)
-                        </span>
-                        <span className="text-xs font-bold px-2 py-1 rounded border bg-indigo-50 text-indigo-600 border-indigo-100 uppercase">
-                            {questionType.replace('_', ' ')}
-                        </span>
-                    </div>
-                    
-                    <div className="p-5">
-                        <div className="text-gray-800 text-sm leading-relaxed font-medium mb-4 text-left text-justify whitespace-pre-wrap">
-                            <Latex>{(questionText || 'Belum ada pertanyaan...').replace(/</g, ' < ')}</Latex>
-                        </div>
-                        {questionImage && <img src={questionImage} className="w-full h-auto my-6 select-none object-contain" alt="Soal" />}
-                        
-                        <div className="space-y-2 text-sm">
-                            {questionType === 'isian' ? (
-                                <div className="bg-gray-50 p-4 rounded-lg border-2 border-dashed border-gray-300 opacity-70">
-                                    <input disabled className="w-full p-2 bg-transparent text-xl font-mono border-b-2 border-gray-300 outline-none" placeholder="Jawaban siswa..." />
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {options.map((opt, i) => {
-                                        const label = ['A','B','C','D','E'][i];
-                                        const isCorrect = questionType === 'pilihan_ganda' ? correctAnswer === label : (Array.isArray(correctAnswer) && correctAnswer.includes(label));
-                                        return (
-                                            <div key={i} className={`p-3 rounded-lg border flex gap-3 items-center ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
-                                                <div className={`w-6 h-6 flex items-center justify-center font-bold rounded text-xs ${isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                                                    {label}
-                                                </div>
-                                                <div className="font-medium text-gray-700">
-                                                    <Latex>{(opt || `Pilihan ${label}`).replace(/</g, ' < ')}</Latex>
-                                                </div>
-                                                {isCorrect && <CheckCircle2 size={16} className="text-green-500 ml-auto"/>}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 text-center text-xs text-gray-400">
-                    *Preview ini menampilkan bagaimana soal terlihat di aplikasi siswa.
-                </div>
-             </div>
+              </div>
+              <div className="mt-4 text-center text-xs text-gray-400">
+                *Preview ini menampilkan bagaimana soal terlihat di aplikasi siswa.
+              </div>
+            </div>
           </div>
         )}
       </div>
-      
+
       <div className="py-6 bg-white border-t border-gray-200 w-full text-center">
         <p className="text-gray-400 text-xs font-mono flex items-center justify-center gap-1">
           <Copyright size={12} /> {new Date().getFullYear()} Created by <span className="font-bold text-indigo-500">Liezira.Tech</span>
