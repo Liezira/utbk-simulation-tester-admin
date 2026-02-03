@@ -86,6 +86,11 @@ const UTBKAdminApp = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewData, setPreviewData] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]); 
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [bulkCreditAmount, setBulkCreditAmount] = useState(0);
+  const [creditSearch, setCreditSearch] = useState('');
+  const [isProcessingCredits, setIsProcessingCredits] = useState(false);
   // STATE UNTUK IMPORT SOAL
   const [showSoalImport, setShowSoalImport] = useState(false);
   const [previewSoal, setPreviewSoal] = useState([]);
@@ -698,6 +703,74 @@ const UTBKAdminApp = () => {
       }
   };
 
+  // Logic Filter User di Modal
+  const getModalUserList = () => {
+    if (!creditSearch) return userList;
+    const lower = creditSearch.toLowerCase();
+    return userList.filter(u => 
+      (u.displayName && u.displayName.toLowerCase().includes(lower)) ||
+      (u.email && u.email.toLowerCase().includes(lower)) ||
+      (u.school && u.school.toLowerCase().includes(lower))
+    );
+  };
+
+  // Logic Toggle Checkbox User
+  const toggleUserSelection = (id) => {
+    if (selectedUserIds.includes(id)) {
+      setSelectedUserIds(selectedUserIds.filter(uid => uid !== id));
+    } else {
+      setSelectedUserIds([...selectedUserIds, id]);
+    }
+  };
+
+  const toggleSelectAllUsersInModal = () => {
+    const visibleUsers = getModalUserList();
+    if (selectedUserIds.length === visibleUsers.length && visibleUsers.length > 0) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(visibleUsers.map(u => u.id));
+    }
+  };
+
+  // Eksekusi Kirim Credit Massal
+  const executeBulkCredits = async () => {
+    if (selectedUserIds.length === 0) {
+      alert("Pilih minimal satu user!");
+      return;
+    }
+    if (bulkCreditAmount <= 0) {
+      alert("Jumlah credit harus lebih dari 0!");
+      return;
+    }
+
+    if (!confirm(`Kirim ${bulkCreditAmount} Credits ke ${selectedUserIds.length} user terpilih?`)) return;
+
+    setIsProcessingCredits(true);
+    try {
+      const batch = writeBatch(db);
+      
+      selectedUserIds.forEach(userId => {
+        const userRef = doc(db, 'users', userId);
+        batch.update(userRef, { 
+          credits: increment(parseInt(bulkCreditAmount)) 
+        });
+      });
+
+      await batch.commit();
+      
+      alert("✅ Berhasil mendistribusikan credits!");
+      setShowCreditModal(false);
+      setSelectedUserIds([]);
+      setBulkCreditAmount(0);
+      fetchUsers('first'); // Refresh data
+    } catch (error) {
+      console.error(error);
+      alert("Gagal mengirim credits.");
+    } finally {
+      setIsProcessingCredits(false);
+    }
+  };
+
   // --- ACTIONS: LEADERBOARD & BANK SOAL ---
   const resetLeaderboard = async () => {
     if (!confirm("⚠️ RESET SEMUA SKOR DI LEADERBOARD?\nToken akan tetap aktif, tapi nilai akan hilang.")) return;
@@ -984,6 +1057,122 @@ const UTBKAdminApp = () => {
     </div>
   );
 
+  // ✅ [BARU] Komponen Modal Bulk Credits
+  const BulkCreditModal = () => {
+    const visibleUsers = getModalUserList();
+    const isAllSelected = visibleUsers.length > 0 && selectedUserIds.length === visibleUsers.length;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
+          
+          {/* Header */}
+          <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-green-600 to-emerald-600 rounded-t-2xl text-white">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Coins size={24} className="text-yellow-300" /> Distribusi Credits Massal
+              </h2>
+              <p className="text-green-100 text-sm mt-1">Pilih user dan tentukan jumlah credit.</p>
+            </div>
+            <button onClick={() => setShowCreditModal(false)} className="hover:bg-white/20 p-2 rounded-full transition">
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Search Bar di Modal */}
+          <div className="p-4 bg-gray-50 border-b">
+            <div className="relative">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+              <input 
+                type="text" 
+                placeholder="Cari Nama / Email / Sekolah..." 
+                value={creditSearch}
+                onChange={(e) => setCreditSearch(e.target.value)}
+                className="w-full pl-10 p-3 border rounded-lg focus:ring-2 focus:ring-green-200 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Table List User */}
+          <div className="flex-1 overflow-y-auto p-0">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-100 sticky top-0 text-gray-600 font-bold uppercase text-xs">
+                <tr>
+                  <th className="p-4 w-12 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllSelected} 
+                      onChange={toggleSelectAllUsersInModal}
+                      className="w-4 h-4 rounded cursor-pointer"
+                    />
+                  </th>
+                  <th className="p-4">User Detail</th>
+                  <th className="p-4">Sekolah</th>
+                  <th className="p-4 text-center">Saldo Saat Ini</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {visibleUsers.map(u => (
+                  <tr key={u.id} className={`hover:bg-green-50 transition ${selectedUserIds.includes(u.id) ? 'bg-green-50' : ''}`}>
+                    <td className="p-4 text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedUserIds.includes(u.id)}
+                        onChange={() => toggleUserSelection(u.id)}
+                        className="w-4 h-4 rounded cursor-pointer"
+                      />
+                    </td>
+                    <td className="p-4">
+                      <div className="font-bold text-gray-800">{u.displayName || 'No Name'}</div>
+                      <div className="text-xs text-gray-500">{u.email}</div>
+                    </td>
+                    <td className="p-4 text-gray-600">{u.school || '-'}</td>
+                    <td className="p-4 text-center">
+                      <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded font-mono font-bold">{u.credits || 0}</span>
+                    </td>
+                  </tr>
+                ))}
+                {visibleUsers.length === 0 && (
+                  <tr><td colSpan="4" className="p-8 text-center text-gray-400">Tidak ada user ditemukan.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="p-6 border-t bg-gray-50 rounded-b-2xl flex items-center justify-between gap-4">
+            <div className="text-sm font-bold text-gray-600">
+              Terpilih: <span className="text-green-600 text-lg">{selectedUserIds.length}</span> User
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2">
+                <span className="text-gray-500 text-sm font-bold">Jumlah Credit:</span>
+                <input 
+                  type="number" 
+                  min="1"
+                  value={bulkCreditAmount}
+                  onChange={(e) => setBulkCreditAmount(e.target.value)}
+                  className="w-20 font-bold text-center outline-none border-b-2 border-green-500 focus:border-green-700"
+                />
+              </div>
+              
+              <button 
+                onClick={executeBulkCredits}
+                disabled={isProcessingCredits || selectedUserIds.length === 0}
+                className="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 disabled:bg-gray-400 flex items-center gap-2 shadow-lg hover:shadow-green-200 transition"
+              >
+                {isProcessingCredits ? <Loader2 className="animate-spin"/> : <Send size={18}/>}
+                Kirim Sekarang
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  };
+
   if (isCheckingRole) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -1033,6 +1222,7 @@ const UTBKAdminApp = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {showPreviewModal && <PreviewUploadModal />}
       {showLeaderboard && <LeaderboardModal />}
+      {showCreditModal && <BulkCreditModal />}
 
       {showSoalImport && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -1503,6 +1693,12 @@ const UTBKAdminApp = () => {
                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition disabled:bg-gray-400"
                   >
                     {isSearching ? 'Mencari...' : 'Cari'}
+                  </button>
+                  <button 
+                    onClick={() => { setShowCreditModal(true); setSelectedUserIds([]); setCreditSearch(''); }}
+                    className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-200 border border-green-200 flex items-center gap-1 transition"
+                  >
+                    <Coins size={14} /> Bulk Send Credits
                   </button>
                   {searchEmail && (
                     <button
