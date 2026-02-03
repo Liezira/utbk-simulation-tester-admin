@@ -995,68 +995,116 @@ const UTBKAdminApp = () => {
     );
   };
 
-  const LeaderboardModal = () => (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
-        <div className="p-6 border-b flex justify-between items-center bg-indigo-600 rounded-t-2xl text-white">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Trophy size={24} className="text-yellow-300" /> Leaderboard Peserta
-          </h2>
-          <button onClick={() => setShowLeaderboard(false)} className="hover:bg-indigo-700 p-2 rounded-full transition">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="p-6 overflow-y-auto">
-          <div className="flex justify-end mb-4">
-            <button
+  const LeaderboardModal = () => {
+    // Filter dan Sort data berdasarkan Score tertinggi, lalu Sisa Waktu terbanyak
+    const sortedData = tokenList
+      .filter(t => t.score !== undefined && t.score !== null)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.finalTimeLeft - a.finalTimeLeft;
+      });
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95%] h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
+          
+          {/* Header Modal */}
+          <div className="p-4 border-b flex justify-between items-center bg-teal-700 rounded-t-2xl text-white">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Trophy size={24} className="text-yellow-300" /> Leaderboard Lengkap (IRT Style)
+            </h2>
+            <button onClick={() => setShowLeaderboard(false)} className="hover:bg-teal-800 p-2 rounded-full transition">
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Tombol Reset */}
+          <div className="p-4 bg-gray-50 border-b flex justify-end">
+             <button
               onClick={resetLeaderboard}
-              className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-100 transition border border-red-200"
+              className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-100 transition border border-red-200 text-sm"
             >
               <Trash2 size={16} /> Reset Semua Data Peringkat
             </button>
           </div>
-          <table className="w-full text-sm text-left">
-            <thead className="bg-indigo-50 text-indigo-800 font-bold uppercase text-xs">
-              <tr>
-                <th className="p-3 text-center">#</th>
-                <th className="p-3">Nama Siswa</th>
-                <th className="p-3">Asal Sekolah</th>
-                <th className="p-3">Kode Token</th>
-                <th className="p-3">No. WhatsApp</th>
-                <th className="p-3 text-center">Score</th>
-                <th className="p-3 text-center">Sisa Waktu</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {getLeaderboardData().map((t, idx) => (
-                <tr key={t.tokenCode} className="hover:bg-gray-50">
-                  <td className="p-3 text-center font-bold">
-                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
-                  </td>
-                  <td className="p-3 font-medium text-gray-800">{t.studentName}</td>
-                  <td className="p-3 text-gray-600">{t.studentSchool || '-'}</td>
-                  <td className="p-3 font-mono text-indigo-600 font-bold">{t.tokenCode}</td>
-                  <td className="p-3 font-mono text-gray-600">{t.studentPhone}</td>
-                  <td className="p-3 text-center font-bold text-indigo-600 text-lg">{t.score}</td>
-                  <td className="p-3 text-center font-mono text-gray-500">
-                    {Math.floor(t.finalTimeLeft / 60)}m {t.finalTimeLeft % 60}s
-                  </td>
-                </tr>
-              ))}
-              {getLeaderboardData().length === 0 && (
-                <tr>
-                  <td colSpan="7" className="p-8 text-center text-gray-400 italic">
-                    Belum ada data nilai peserta.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+
+          {/* Tabel Scrollable */}
+          <div className="flex-1 overflow-auto p-4 bg-gray-100">
+            <div className="bg-white shadow-lg border border-gray-300">
+              <table className="min-w-full text-[10px] md:text-xs border-collapse font-sans">
+                <thead className="sticky top-0 z-10">
+                  {/* Header Baris 1: Judul Kolom & Mapel */}
+                  <tr className="bg-teal-700 text-white font-bold text-center uppercase tracking-wider">
+                    <th rowSpan="2" className="border border-gray-400 p-2 w-10">Rank</th>
+                    <th rowSpan="2" className="border border-gray-400 p-2 min-w-[150px]">Nama Siswa</th>
+                    <th rowSpan="2" className="border border-gray-400 p-2 min-w-[120px]">Sekolah</th>
+                    
+                    {/* Header Group Mapel */}
+                    <th colSpan="2" className="border border-gray-400 p-1 bg-teal-800">PU</th>
+                    <th colSpan="2" className="border border-gray-400 p-1 bg-teal-800">PPU</th>
+                    <th colSpan="2" className="border border-gray-400 p-1 bg-teal-800">PK</th>
+                    <th colSpan="2" className="border border-gray-400 p-1 bg-teal-800">PBM</th>
+                    <th colSpan="2" className="border border-gray-400 p-1 bg-teal-800">Lit. Indo</th>
+                    <th colSpan="2" className="border border-gray-400 p-1 bg-teal-800">Lit. Ing</th>
+                    <th colSpan="2" className="border border-gray-400 p-1 bg-teal-800">PM</th>
+                    
+                    <th rowSpan="2" className="border border-gray-400 p-2 w-16 bg-yellow-600 text-white">RATA RATA</th>
+                  </tr>
+                  
+                  {/* Header Baris 2: B (Benar) & Skor */}
+                  <tr className="bg-teal-600 text-white font-bold text-center text-[9px] uppercase">
+                    {/* Loop 7 kali untuk 7 mapel */}
+                    {Array(7).fill(null).map((_, i) => (
+                      <React.Fragment key={i}>
+                        <th className="border border-gray-400 px-1 py-1 w-8 bg-teal-600">B</th>
+                        <th className="border border-gray-400 px-1 py-1 w-10 bg-teal-500">Skor</th>
+                      </React.Fragment>
+                    ))}
+                  </tr>
+                </thead>
+                
+                <tbody className="text-gray-900 bg-white">
+                  {sortedData.length === 0 ? (
+                    <tr>
+                      <td colSpan="20" className="p-8 text-center text-gray-400 italic">Belum ada data nilai masuk.</td>
+                    </tr>
+                  ) : (
+                    sortedData.map((t, idx) => {
+                      // Helper untuk mengambil nilai aman dari object scoreDetails
+                      // Struktur: t.scoreDetails['pu'].b atau t.scoreDetails['pu'].skor
+                      const getVal = (id, type) => t.scoreDetails?.[id]?.[type] || 0;
+                      
+                      return (
+                        <tr key={t.tokenCode} className={`text-center hover:bg-yellow-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                          <td className="border border-gray-300 p-2 font-bold">{idx + 1}</td>
+                          <td className="border border-gray-300 p-2 text-left font-medium truncate max-w-[200px]">{t.studentName}</td>
+                          <td className="border border-gray-300 p-2 text-left truncate max-w-[150px]">{t.studentSchool || '-'}</td>
+                          
+                          {/* Render Nilai per Mapel (PU, PPU, PK, PBM, LBI, LBE, PM) */}
+                          {['pu', 'ppu', 'pk', 'pbm', 'lbi', 'lbe', 'pm'].map(id => (
+                            <React.Fragment key={id}>
+                              <td className="border border-gray-300 p-1 text-gray-500">{getVal(id, 'b')}</td>
+                              <td className="border border-gray-300 p-1 font-semibold text-teal-700 bg-teal-50/30">{getVal(id, 'skor')}</td>
+                            </React.Fragment>
+                          ))}
+                          
+                          {/* Total Rata-rata */}
+                          <td className="border border-gray-300 p-2 font-black text-white bg-yellow-500 text-sm">
+                            {t.score}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  );
-
+    );
+  };
+  
   // ✅ [BARU] Komponen Modal Bulk Credits
   const BulkCreditModal = () => {
     const visibleUsers = getModalUserList();
