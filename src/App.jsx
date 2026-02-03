@@ -21,7 +21,7 @@ const SUBTESTS = [
   { id: 'pu', name: 'Penalaran Umum', questions: 30 },
   { id: 'ppu', name: 'Pengetahuan & Pemahaman Umum', questions: 20 },
   { id: 'pbm', name: 'Pemahaman Bacaan & Menulis', questions: 20 },
-  { id: 'pk', name: 'Pengetahuan Kuantitatif', questions: 15 },
+  { id: 'pk', name: 'Pengetahuan Kuantitatif', questions: 20 },
   { id: 'lbi', name: 'Literasi Bahasa Indonesia', questions: 30 },
   { id: 'lbe', name: 'Literasi Bahasa Inggris', questions: 20 },
   { id: 'pm', name: 'Penalaran Matematika', questions: 20 },
