@@ -336,6 +336,15 @@ const UTBKAdminApp = () => {
       } 
   };
 
+  const filteredUserList = userList.filter(u => {
+    const term = searchEmail.toLowerCase();
+    return (
+      (u.displayName || '').toLowerCase().includes(term) ||
+      (u.email || '').toLowerCase().includes(term) ||
+      (u.school || '').toLowerCase().includes(term)
+    );
+  });
+
   const getLeaderboardData = () => {
       const rankedTokens = tokenList.filter(t => t.score !== undefined && t.score !== null);
       rankedTokens.sort((a, b) => {
@@ -942,16 +951,6 @@ const UTBKAdminApp = () => {
     const validCount = previewData.filter(r => r.valid).length;
     const invalidCount = previewData.length - validCount;
 
-    // Filter User secara Realtime (Nama atau Email)
-  const filteredUserList = userList.filter(u => {
-    const term = searchEmail.toLowerCase();
-    return (
-      (u.displayName || '').toLowerCase().includes(term) ||
-      (u.email || '').toLowerCase().includes(term) ||
-      (u.school || '').toLowerCase().includes(term)
-    );
-  });
-
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
@@ -1203,20 +1202,16 @@ const UTBKAdminApp = () => {
       </div>
     );
   };
-  
-  // --- BULK CREDIT MODAL (FIXED SEARCH & GLITCH) ---
+
+  // ... (Setelah LeaderboardModal selesai)
   const BulkCreditModal = () => {
-    const [localSearch, setLocalSearch] = useState(''); 
-    
-    // Logic Filtering Client-Side 
-    const visibleUsers = userList.filter(u => {
-      const term = localSearch.toLowerCase();
-      return (
-        (u.displayName || '').toLowerCase().includes(term) ||
-        (u.email || '').toLowerCase().includes(term) ||
-        (u.school || '').toLowerCase().includes(term)
-      );
-    });
+   
+    const [localSearch, setLocalSearch] = useState('');
+    const visibleUsers = userList.filter(u => 
+      (u.displayName && u.displayName.toLowerCase().includes(localSearch.toLowerCase())) ||
+      (u.email && u.email.toLowerCase().includes(localSearch.toLowerCase())) ||
+      (u.school && u.school.toLowerCase().includes(localSearch.toLowerCase()))
+    );
 
     const isAllSelected = visibleUsers.length > 0 && selectedUserIds.length === visibleUsers.length;
 
@@ -1832,7 +1827,7 @@ const UTBKAdminApp = () => {
                 </div>
               </div>
 
-              {/* Render Tabel dengan 'filteredUserList' */}
+              {/* Render Tabel dengan 'filteredUserList' yang sudah dihitung di atas */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-gray-50">
@@ -1881,7 +1876,6 @@ const UTBKAdminApp = () => {
                 </table>
               </div>
               
-              {/* Pagination Controls (Hanya muncul jika tidak sedang search) */}
               {!searchEmail && (
                 <div className="flex justify-between items-center mt-4 border-t pt-4">
                    <div className="text-xs text-gray-400">Menampilkan 20 user per halaman</div>
