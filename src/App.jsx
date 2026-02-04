@@ -944,10 +944,11 @@ const UTBKAdminApp = () => {
 
     // Filter User secara Realtime (Nama atau Email)
   const filteredUserList = userList.filter(u => {
-    const term = searchEmail.toLowerCase(); // Kita pakai state searchEmail yg lama biar ga ubah banyak
+    const term = searchEmail.toLowerCase();
     return (
       (u.displayName || '').toLowerCase().includes(term) ||
-      (u.email || '').toLowerCase().includes(term)
+      (u.email || '').toLowerCase().includes(term) ||
+      (u.school || '').toLowerCase().includes(term)
     );
   });
 
@@ -1776,18 +1777,18 @@ const UTBKAdminApp = () => {
             </div>
           </div>
         ) : viewMode === 'users' ? (
-          // --- VIEW MODE: USERS ---
+          // --- VIEW MODE: USERS (SMART SEARCH) ---
+          // Langsung render tampilannya, karena filteredUserList sudah dihitung di atas
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white p-6 rounded-xl shadow border border-indigo-100">
                 <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Users</h3>
                 <div className="text-3xl font-black text-indigo-900">{totalUsersCount}</div>
-                <p className="text-xs text-gray-400 mt-1">Ditampilkan: {userList.length} user</p>
+                <p className="text-xs text-gray-400 mt-1">Ditampilkan: {filteredUserList.length} user</p>
               </div>
               <div className="bg-white p-6 rounded-xl shadow border border-green-100">
                 <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Credits Beredar</h3>
                 <div className="text-3xl font-black text-green-600">{totalCreditsCount}</div>
-                <p className="text-xs text-gray-400 mt-1">Dari halaman ini</p>
               </div>
               <div className="bg-white p-6 rounded-xl shadow border border-blue-100">
                 <h3 className="text-gray-500 text-xs font-bold uppercase mb-1">Total Tokens</h3>
@@ -1796,70 +1797,42 @@ const UTBKAdminApp = () => {
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
                 <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2">
                   <Wallet size={20} /> Manajemen Saldo User
                 </h2>
 
-                <div className="flex gap-2">
-                  <div className="relative">
+                <div className="flex gap-2 w-full md:w-auto">
+                  <div className="relative w-full md:w-64">
                     <input
-                        type="text"
-                        value={searchEmail}
-                        onChange={(e) => setSearchEmail(e.target.value)}
-                        placeholder="Filter Nama / Email..."
-                        className="pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-200 outline-none w-64"
-                      />
+                      type="text"
+                      value={searchEmail}
+                      onChange={(e) => setSearchEmail(e.target.value)}
+                      placeholder="Cari Nama / Email / Sekolah..."
+                      className="pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-200 outline-none w-full"
+                    />
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   </div>
-                  <button
-                    onClick={handleSearchUser}
-                    disabled={isSearching}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition disabled:bg-gray-400"
-                  >
-                    {isSearching ? 'Mencari...' : 'Cari'}
-                  </button>
-                  <button 
-                    onClick={() => { setShowCreditModal(true); setSelectedUserIds([]); setCreditSearch(''); }}
-                    className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-200 border border-green-200 flex items-center gap-1 transition"
-                  >
-                    <Coins size={14} /> Bulk Send Credits
-                  </button>
+                  
                   {searchEmail && (
                     <button
-                      onClick={handleClearSearch}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition"
+                      onClick={() => setSearchEmail('')}
+                      className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition text-xs"
                     >
                       Reset
                     </button>
                   )}
+
+                  <button 
+                    onClick={() => { setShowCreditModal(true); setSelectedUserIds([]); }}
+                    className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-200 border border-green-200 flex items-center gap-1 transition whitespace-nowrap"
+                  >
+                    <Coins size={14} /> Bulk Credits
+                  </button>
                 </div>
               </div>
 
-              {!searchEmail && (
-                <div className="flex justify-end mb-4">
-                  <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 border border-gray-200">
-                    <button
-                      onClick={() => fetchUsers('prev')}
-                      disabled={userCurrentPage === 1}
-                      className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
-                      title="Halaman Sebelumnya"
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <span className="text-xs font-bold px-2 text-gray-600 min-w-[30px] text-center">{userCurrentPage}</span>
-                    <button
-                      onClick={() => fetchUsers('next')}
-                      disabled={!userIsNextAvailable}
-                      className="p-1.5 hover:bg-white rounded disabled:opacity-30 transition shadow-sm text-gray-600"
-                      title="Halaman Selanjutnya"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
+              {/* Render Tabel dengan 'filteredUserList' */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-gray-50">
@@ -1868,13 +1841,13 @@ const UTBKAdminApp = () => {
                       <th className="p-3">Sekolah</th>
                       <th className="p-3">HP</th>
                       <th className="p-3 text-center">Sisa Credits</th>
-                      <th className="p-3 text-center">Token Dibuat</th>
+                      <th className="p-3 text-center">Token</th>
                       <th className="p-3 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {filteredUserList.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
+                      <tr key={user.id} className="hover:bg-gray-50 transition">
                         <td className="p-3">
                           <div className="font-bold text-gray-800">{user.displayName || 'No Name'}</div>
                           <div className="text-xs text-gray-500">{user.email}</div>
@@ -1882,11 +1855,7 @@ const UTBKAdminApp = () => {
                         <td className="p-3 text-gray-600">{user.school || '-'}</td>
                         <td className="p-3 font-mono text-gray-500">{user.phone || '-'}</td>
                         <td className="p-3 text-center">
-                          <span
-                            className={`px-3 py-1 rounded-full font-bold ${
-                              user.credits > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                            }`}
-                          >
+                          <span className={`px-3 py-1 rounded-full font-bold ${user.credits > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {user.credits || 0}
                           </span>
                         </td>
@@ -1895,37 +1864,38 @@ const UTBKAdminApp = () => {
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex justify-center gap-2">
-                            <button
-                              onClick={() => handleAddCredits(user.id)}
-                              className="bg-green-50 text-green-600 p-2 rounded hover:bg-green-100 border border-green-200"
-                              title="Top Up Manual"
-                            >
+                            <button onClick={() => handleAddCredits(user.id)} className="bg-green-50 text-green-600 p-2 rounded hover:bg-green-100 border border-green-200" title="Top Up Manual">
                               <Coins size={16} /> +
                             </button>
-                            <button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="bg-red-50 text-red-600 p-2 rounded hover:bg-red-100 border border-red-200"
-                              title="Hapus User"
-                            >
+                            <button onClick={() => handleDeleteUser(user.id)} className="bg-red-50 text-red-600 p-2 rounded hover:bg-red-100 border border-red-200" title="Hapus User">
                               <Trash2 size={16} />
                             </button>
                           </div>
                         </td>
                       </tr>
                     ))}
-                    {userList.length === 0 && (
-                      <tr>
-                        <td colSpan="6" className="p-8 text-center text-gray-400">
-                          Belum ada user yang mendaftar.
-                        </td>
-                      </tr>
+                    {filteredUserList.length === 0 && (
+                      <tr><td colSpan="6" className="p-8 text-center text-gray-400">User tidak ditemukan.</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
+              
+              {/* Pagination Controls (Hanya muncul jika tidak sedang search) */}
+              {!searchEmail && (
+                <div className="flex justify-between items-center mt-4 border-t pt-4">
+                   <div className="text-xs text-gray-400">Menampilkan 20 user per halaman</div>
+                   <div className="flex items-center gap-2">
+                      <button onClick={() => fetchUsers('prev')} disabled={userCurrentPage === 1} className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"><ChevronLeft size={16}/></button>
+                      <span className="text-xs font-bold">{userCurrentPage}</span>
+                      <button onClick={() => fetchUsers('next')} disabled={!userIsNextAvailable} className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"><ChevronRight size={16}/></button>
+                   </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
+          
           // --- VIEW MODE: BANK SOAL ---
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
