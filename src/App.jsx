@@ -522,6 +522,88 @@ const UTBKAdminApp = () => {
     }
   };
 
+  const handleDownloadLeaderboard = async () => {
+  if (!confirm("Download data leaderboard lengkap dalam format Excel?")) return;
+  try {
+    // Ambil semua tokens, urutkan seperti di leaderboard
+    const allTokens = [...tokenList].sort((a, b) => {
+      const scoreA = a.score !== undefined && a.score !== null ? a.score : 0;
+      const scoreB = b.score !== undefined && b.score !== null ? b.score : 0;
+      
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return (b.finalTimeLeft || 0) - (a.finalTimeLeft || 0);
+    });
+
+    const dataToExport = allTokens.map((t, index) => {
+      // Helper function untuk ambil nilai aman
+      const getVal = (id, type) => t.scoreDetails?.[id]?.[type] || 0;
+      
+      return {
+        "Rank": index + 1,
+        "Nama Siswa": t.studentName,
+        "Asal Sekolah": t.studentSchool || '-',
+        
+        // PU
+        "PU - Benar": getVal('pu', 'b'),
+        "PU - Skor": getVal('pu', 'skor'),
+        
+        // PPU
+        "PPU - Benar": getVal('ppu', 'b'),
+        "PPU - Skor": getVal('ppu', 'skor'),
+        
+        // PK
+        "PK - Benar": getVal('pk', 'b'),
+        "PK - Skor": getVal('pk', 'skor'),
+        
+        // PBM
+        "PBM - Benar": getVal('pbm', 'b'),
+        "PBM - Skor": getVal('pbm', 'skor'),
+        
+        // Literasi Indonesia
+        "Lit Indo - Benar": getVal('lbi', 'b'),
+        "Lit Indo - Skor": getVal('lbi', 'skor'),
+        
+        // Literasi Inggris
+        "Lit Inggris - Benar": getVal('lbe', 'b'),
+        "Lit Inggris - Skor": getVal('lbe', 'skor'),
+        
+        // PM
+        "PM - Benar": getVal('pm', 'b'),
+        "PM - Skor": getVal('pm', 'skor'),
+        
+        // Rata-rata
+        "RATA-RATA": t.score !== undefined && t.score !== null ? t.score : 0
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Leaderboard UTBK");
+
+    // Atur lebar kolom
+    const wscols = [
+      {wch: 6},  // Rank
+      {wch: 25}, // Nama
+      {wch: 20}, // Sekolah
+      {wch: 8}, {wch: 8},   // PU
+      {wch: 8}, {wch: 8},   // PPU
+      {wch: 8}, {wch: 8},   // PK
+      {wch: 8}, {wch: 8},   // PBM
+      {wch: 8}, {wch: 8},   // Lit Indo
+      {wch: 8}, {wch: 8},   // Lit Inggris
+      {wch: 8}, {wch: 8},   // PM
+      {wch: 12}  // Rata-rata
+    ];
+    worksheet['!cols'] = wscols;
+
+    XLSX.writeFile(workbook, `Leaderboard_UTBK_${new Date().toISOString().slice(0,10)}.xlsx`);
+    alert("✅ Download Berhasil!");
+  } catch (error) {
+    console.error("Gagal export leaderboard:", error);
+    alert("Gagal mendownload data leaderboard.");
+  }
+};
+
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1008,14 +1090,21 @@ const UTBKAdminApp = () => {
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95%] h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
           
-          {/* Header Modal */}
           <div className="p-4 border-b flex justify-between items-center bg-teal-700 rounded-t-2xl text-white">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <Trophy size={24} className="text-yellow-300" /> Leaderboard Lengkap (IRT Style)
             </h2>
-            <button onClick={() => setShowLeaderboard(false)} className="hover:bg-teal-800 p-2 rounded-full transition">
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDownloadLeaderboard}
+                className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg"
+              >
+                <List size={18} /> Download Excel
+              </button>
+              <button onClick={() => setShowLeaderboard(false)} className="hover:bg-teal-800 p-2 rounded-full transition">
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Tombol Reset */}
