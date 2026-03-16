@@ -247,6 +247,8 @@ const UTBKAdminApp = () => {
   const [totalCreditsCount, setTotalCreditsCount] = useState(0);
 
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(false);
   // ✅ BARU: State untuk modal violation rules
   const [showViolationRules, setShowViolationRules] = useState(false);
 
@@ -471,6 +473,24 @@ const UTBKAdminApp = () => {
       .sort((a, b) => b.score !== a.score ? b.score - a.score : b.finalTimeLeft - a.finalTimeLeft);
   };
 
+  // ✅ FIX: Fetch SEMUA token dari Firestore untuk leaderboard (tidak terbatas 50)
+  const fetchAllTokensForLeaderboard = async () => {
+    setIsLeaderboardLoading(true);
+    try {
+      const querySnapshot = await getDocs(query(collection(db, 'tokens'), orderBy('score', 'desc')));
+      const allTokens = querySnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(t => t.score !== undefined && t.score !== null)
+        .sort((a, b) => b.score !== a.score ? b.score - a.score : (b.finalTimeLeft || 0) - (a.finalTimeLeft || 0));
+      setLeaderboardData(allTokens);
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+      alert("Gagal memuat data leaderboard.");
+    } finally {
+      setIsLeaderboardLoading(false);
+    }
+  };
+
   const fetchTokens = async (direction) => {
     try {
       let q;
@@ -580,10 +600,15 @@ const UTBKAdminApp = () => {
   const handleDownloadLeaderboard = async () => {
     if (!confirm("Download data leaderboard lengkap dalam format Excel?")) return;
     try {
-      const allTokens = [...tokenList].sort((a, b) => {
-        const sA = a.score ?? 0, sB = b.score ?? 0;
-        return sB !== sA ? sB - sA : (b.finalTimeLeft||0) - (a.finalTimeLeft||0);
-      });
+      // ✅ FIX: Fetch SEMUA token dari Firestore, bukan dari tokenList yang terpaginasi
+      const querySnapshot = await getDocs(query(collection(db, 'tokens'), orderBy('createdAt', 'desc')));
+      const allTokens = querySnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(t => t.score !== undefined && t.score !== null)
+        .sort((a, b) => {
+          const sA = a.score ?? 0, sB = b.score ?? 0;
+          return sB !== sA ? sB - sA : (b.finalTimeLeft||0) - (a.finalTimeLeft||0);
+        });
       const getVal = (t, id, type) => t.scoreDetails?.[id]?.[type] || 0;
       const dataToExport = allTokens.map((t, idx) => ({
         "Rank": idx + 1, "Nama Siswa": t.studentName, "Asal Sekolah": t.studentSchool || '-',
@@ -936,15 +961,18 @@ const UTBKAdminApp = () => {
   };
 
   const LeaderboardModal = () => {
-    const sortedData = tokenList
-      .filter(t => t.score !== undefined && t.score !== null)
-      .sort((a, b) => b.score !== a.score ? b.score - a.score : b.finalTimeLeft - a.finalTimeLeft);
+    // ✅ FIX: Gunakan leaderboardData (semua token dari Firestore), bukan tokenList (hanya 50 terpaginasi)
+    const sortedData = leaderboardData;
 
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95%] h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
           <div className="p-4 border-b flex justify-between items-center bg-teal-700 rounded-t-2xl text-white">
-            <h2 className="text-xl font-bold flex items-center gap-2"><Trophy size={24} className="text-yellow-300" /> Leaderboard Lengkap (IRT Style)</h2>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Trophy size={24} className="text-yellow-300" /> Leaderboard Lengkap (IRT Style)
+              {/* ✅ Tampilkan total peserta yang sudah mengerjakan */}
+              <span className="text-sm font-normal bg-teal-600 px-2 py-0.5 rounded-full ml-2">{sortedData.length} peserta</span>
+            </h2>
             <div className="flex items-center gap-2">
               <button onClick={handleDownloadLeaderboard} className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg"><List size={18} /> Download Excel</button>
               <button onClick={() => setShowLeaderboard(false)} className="hover:bg-teal-800 p-2 rounded-full transition"><X size={20} /></button>
@@ -954,6 +982,13 @@ const UTBKAdminApp = () => {
             <button onClick={resetLeaderboard} className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-100 transition border border-red-200 text-sm"><Trash2 size={16} /> Reset Semua Data Peringkat</button>
           </div>
           <div className="flex-1 overflow-auto p-4 bg-gray-100">
+            {/* ✅ Loading state saat fetch semua data */}
+            {isLeaderboardLoading ? (
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-500">
+                <Loader2 size={40} className="animate-spin text-teal-600" />
+                <p className="font-medium">Memuat semua data leaderboard...</p>
+              </div>
+            ) : (
             <div className="bg-white shadow-lg border border-gray-300">
               <table className="min-w-full text-[10px] md:text-xs border-collapse font-sans">
                 <thead className="sticky top-0 z-10">
@@ -980,20 +1015,26 @@ const UTBKAdminApp = () => {
                   {sortedData.length === 0 ? (
                     <tr><td colSpan="22" className="p-8 text-center text-gray-400 italic">Belum ada data nilai masuk.</td></tr>
                   ) : sortedData.map((t, idx) => {
-                    const getVal = (id, type) => t.scoreDetails?.[id]?.[type] || 0;
+                    // ✅ Tampilkan '-' untuk subtest yang tidak ada datanya, bukan '0'
+                    const getVal = (id, type) => {
+                      const val = t.scoreDetails?.[id]?.[type];
+                      return val !== undefined && val !== null ? val : '-';
+                    };
+                    const hasSubtestData = t.scoreDetails && Object.keys(t.scoreDetails).length > 0;
                     return (
                       <tr key={t.tokenCode} className={`text-center hover:bg-yellow-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                        <td className="border border-gray-300 p-2 font-bold">{idx + 1}</td>
+                        <td className="border border-gray-300 p-2 font-bold">
+                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
+                        </td>
                         <td className="border border-gray-300 p-2 text-left font-medium truncate max-w-[200px]">{t.studentName}</td>
                         <td className="border border-gray-300 p-2 text-left truncate max-w-[150px]">{t.studentSchool || '-'}</td>
                         {['pu','ppu','pk','pbm','lbi','lbe','pm'].map(id => (
                           <React.Fragment key={id}>
                             <td className="border border-gray-300 p-1 text-gray-500">{getVal(id, 'b')}</td>
-                            <td className="border border-gray-300 p-1 font-semibold text-teal-700 bg-teal-50/30">{getVal(id, 'skor')}</td>
+                            <td className={`border border-gray-300 p-1 font-semibold ${hasSubtestData ? 'text-teal-700 bg-teal-50/30' : 'text-gray-300'}`}>{getVal(id, 'skor')}</td>
                           </React.Fragment>
                         ))}
                         <td className="border border-gray-300 p-2 font-black text-white bg-yellow-500 text-sm">{t.score}</td>
-                        {/* ✅ BARU: Kolom Poin Pelanggaran di Leaderboard */}
                         <td className={`border border-gray-300 p-2 font-bold text-sm ${(t.violationScore||0) >= VIOLATION_SCORING.warningThreshold ? 'bg-red-100 text-red-600' : 'text-gray-400'}`}>
                           {t.violationScore || 0}
                         </td>
@@ -1003,6 +1044,7 @@ const UTBKAdminApp = () => {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         </div>
       </div>
@@ -1153,7 +1195,7 @@ const UTBKAdminApp = () => {
           <button onClick={() => setViewMode('tokens')} className={`px-4 py-2 rounded ${viewMode === 'tokens' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600'}`}>Token</button>
           <button onClick={() => setViewMode('users')} className={`px-4 py-2 rounded flex items-center gap-2 ${viewMode === 'users' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600'}`}><Users size={16} /> Users & Credits</button>
           <button onClick={() => setViewMode('soal')} className={`px-4 py-2 rounded ${viewMode === 'soal' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600'}`}>Bank Soal</button>
-          <button onClick={() => setShowLeaderboard(true)} className="px-4 py-2 rounded bg-yellow-100 text-yellow-700 font-bold flex items-center gap-2 hover:bg-yellow-200 transition"><Trophy size={16} /> Leaderboard</button>
+          <button onClick={() => { setShowLeaderboard(true); fetchAllTokensForLeaderboard(); }} className="px-4 py-2 rounded bg-yellow-100 text-yellow-700 font-bold flex items-center gap-2 hover:bg-yellow-200 transition"><Trophy size={16} /> Leaderboard</button>
           {/* ✅ BARU: Tombol Violation Rules di Navbar */}
           <button onClick={() => setShowViolationRules(true)} className="px-4 py-2 rounded bg-orange-100 text-orange-700 font-bold flex items-center gap-2 hover:bg-orange-200 transition"><Shield size={16} /> Aturan Ujian</button>
           <button onClick={handleLogout} className="text-red-600 px-3"><LogOut size={18} /></button>
