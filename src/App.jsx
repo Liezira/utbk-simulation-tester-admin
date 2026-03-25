@@ -245,6 +245,10 @@ const UTBKAdminApp = () => {
   const [totalUsersCount, setTotalUsersCount] = useState(0);
   const [totalTokensCount, setTotalTokensCount] = useState(0);
   const [totalCreditsCount, setTotalCreditsCount] = useState(0);
+  // FIX Bug 5: State statistik token yang dihitung dari server (bukan dari tokenList yg limit 50)
+  const [totalActiveTokensCount, setTotalActiveTokensCount] = useState(0);
+  const [totalUsedTokensCount, setTotalUsedTokensCount] = useState(0);
+  const [totalExpiredTokensCount, setTotalExpiredTokensCount] = useState(0);
 
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState([]);
@@ -342,6 +346,24 @@ const UTBKAdminApp = () => {
         setTotalTokensCount(tokensSnap.data().count);
       } catch (error) {
         console.error("Error loading counts:", error);
+      }
+
+      // FIX Bug 5: Hitung statistik token (active/used/expired) langsung dari server
+      // menggunakan getCountFromServer agar akurat walau data > 50 token.
+      // tokenList hanya berisi 50 terakhir sehingga tidak bisa dipakai untuk statistik global.
+      try {
+        const now = new Date();
+        const cutoff24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+        const [activeSnap, usedSnap, expiredSnap] = await Promise.all([
+          getCountFromServer(query(collection(db, 'tokens'), where('status', '==', 'active'), where('createdAt', '>', cutoff24h))),
+          getCountFromServer(query(collection(db, 'tokens'), where('status', '==', 'used'))),
+          getCountFromServer(query(collection(db, 'tokens'), where('createdAt', '<=', cutoff24h), where('status', '==', 'active'))),
+        ]);
+        setTotalActiveTokensCount(activeSnap.data().count);
+        setTotalUsedTokensCount(usedSnap.data().count);
+        setTotalExpiredTokensCount(expiredSnap.data().count);
+      } catch (error) {
+        console.error("Error loading token stats:", error);
       }
     };
     if (screen === 'dashboard') loadCounts();
@@ -678,6 +700,7 @@ const UTBKAdminApp = () => {
         await batchOp.commit();
       }
       alert(`✅ Sukses generate ${successCount} token!`);
+      refreshServerStats();
       fetchTokens('first');
     } catch { alert("Gagal melakukan import massal."); } 
     finally { setIsSending(false); setPreviewData([]); setSelectedRows([]); }
@@ -728,6 +751,8 @@ const UTBKAdminApp = () => {
         status: 'active', createdAt: new Date().toISOString(), isSent: false, sentMethod: '-',
         score: null, createdBy: 'ADMIN', violationScore: 0
       });
+      // Refresh stats dari server setelah token baru dibuat
+      refreshServerStats();
       if(confirm(`Token Berhasil: ${tokenCode}\n\nKirim via Jalur Default?`)) {
         if (autoSendMode === 'fonnte') await sendFonnteMessage(newTokenName, newTokenPhone, tokenCode);
         else if (autoSendMode === 'js_app') await sendJsDirect(newTokenName, newTokenPhone, tokenCode);
@@ -738,7 +763,30 @@ const UTBKAdminApp = () => {
     } catch { alert('Gagal generate token.'); }
   };
 
-  const deleteToken = async (code) => { if(confirm('Hapus token ini?')) { await deleteDoc(doc(db, 'tokens', code)); fetchTokens('first'); }};
+  // Helper: refresh semua statistik dari server (dipanggil setelah mutasi token)
+  const refreshServerStats = async () => {
+    try {
+      const [tokensSnap] = await Promise.all([
+        getCountFromServer(collection(db, 'tokens')),
+      ]);
+      setTotalTokensCount(tokensSnap.data().count);
+
+      const now = new Date();
+      const cutoff24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      const [activeSnap, usedSnap, expiredSnap] = await Promise.all([
+        getCountFromServer(query(collection(db, 'tokens'), where('status', '==', 'active'), where('createdAt', '>', cutoff24h))),
+        getCountFromServer(query(collection(db, 'tokens'), where('status', '==', 'used'))),
+        getCountFromServer(query(collection(db, 'tokens'), where('createdAt', '<=', cutoff24h), where('status', '==', 'active'))),
+      ]);
+      setTotalActiveTokensCount(activeSnap.data().count);
+      setTotalUsedTokensCount(usedSnap.data().count);
+      setTotalExpiredTokensCount(expiredSnap.data().count);
+    } catch (e) {
+      console.warn("Gagal refresh stats:", e);
+    }
+  };
+
+  const deleteToken = async (code) => { if(confirm('Hapus token ini?')) { await deleteDoc(doc(db, 'tokens', code)); refreshServerStats(); fetchTokens('first'); }};
   
   const resetScore = async (code) => {
     if(confirm('Reset ujian siswa ini? Status akan kembali AKTIF dan nilai dihapus.')) {
@@ -746,6 +794,7 @@ const UTBKAdminApp = () => {
         status: 'active', score: null, answers: {}, finalTimeLeft: null,
         createdAt: new Date().toISOString(), violationScore: 0
       });
+      refreshServerStats();
       fetchTokens('first');
     }
   };
@@ -754,6 +803,7 @@ const UTBKAdminApp = () => {
     if (!confirm("⚠️ PERINGATAN: Hapus SEMUA data?")) return; 
     try { 
       await Promise.all(tokenList.map(t => deleteDoc(doc(db, "tokens", t.tokenCode)))); 
+      refreshServerStats();
       alert("Semua terhapus."); fetchTokens('first'); 
     } catch { alert("Gagal."); } 
   };
@@ -1247,9 +1297,9 @@ const UTBKAdminApp = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {[
                   { key: 'all', label: 'Total', count: tokenList.length, color: 'indigo' },
-                  { key: 'active', label: 'Aktif', count: activeTokens.length, color: 'green' },
-                  { key: 'used', label: 'Terpakai', count: usedTokens.length, color: 'gray' },
-                  { key: 'expired', label: 'Expired', count: expiredTokens.length, color: 'red' },
+                  { key: 'active', label: 'Aktif', count: totalActiveTokensCount, color: 'green' },
+                  { key: 'used', label: 'Terpakai', count: totalUsedTokensCount, color: 'gray' },
+                  { key: 'expired', label: 'Expired', count: totalExpiredTokensCount, color: 'red' },
                 ].map(({ key, label, count, color }) => (
                   <button key={key} onClick={() => setFilterStatus(key)} className={`p-3 rounded-lg border text-center transition ${filterStatus === key ? `bg-${color}-50 border-${color}-500 ring-2 ring-${color}-200` : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                     <p className={`text-xs text-${color}-600 uppercase font-bold`}>{label}</p>
