@@ -115,6 +115,59 @@ const RichTextToolbar = ({ textareaRef, value, onChange }) => {
   );
 };
 
+// ✅ FIX: Markdown → HTML converter (bold, italic, underline, strike, super, sub)
+const markdownToHtml = (str) => {
+  if (!str) return '';
+  let s = str;
+  // Subscript/superscript dengan () harus diproses DULUAN agar tidak clash dengan italic _
+  s = s.replace(/_\(([^)]*)\)/g,   '<sub>$1</sub>');
+  s = s.replace(/\^\(([^)]*)\)/g,  '<sup>$1</sup>');
+  // Bold: **teks**
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Strikethrough: ~~teks~~
+  s = s.replace(/~~([^~]+)~~/g,    '<s>$1</s>');
+  // Underline HTML pass-through: <u>teks</u>
+  s = s.replace(/<u>([\s\S]*?)<\/u>/g, '<u>$1</u>');
+  // Italic: _teks_ (bukan subscript _(...) yang sudah dikonsumsi di atas)
+  s = s.replace(/_([^_\n(][^_\n]*)_/g, '<em>$1</em>');
+  return s;
+};
+
+// ✅ FIX: Hybrid renderer — markdown di luar $...$ blocks, KaTeX di dalam $...$
+const MathText = ({ children, className }) => {
+  if (!children) return null;
+  const text = String(children);
+
+  const segments = [];
+  const mathRegex = /(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g;
+  let lastIdx = 0, m;
+
+  while ((m = mathRegex.exec(text)) !== null) {
+    if (m.index > lastIdx) {
+      segments.push({ type: 'md', content: text.slice(lastIdx, m.index) });
+    }
+    segments.push({ type: 'math', content: m[0] });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) {
+    segments.push({ type: 'md', content: text.slice(lastIdx) });
+  }
+
+  return (
+    <span className={className}>
+      {segments.map((seg, i) =>
+        seg.type === 'math'
+          ? <Latex key={i}>{seg.content}</Latex>
+          : <span
+              key={i}
+              style={{ whiteSpace: 'pre-wrap' }}
+              dangerouslySetInnerHTML={{ __html: markdownToHtml(seg.content) }}
+            />
+      )}
+    </span>
+  );
+};
+
 // ✅ BARU: Komponen Violation Rules / Scoring Panel (untuk ditampilkan di admin)
 const ViolationRulesModal = ({ onClose }) => (
   <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -1613,8 +1666,8 @@ const UTBKAdminApp = () => {
                   <span className="text-xs font-bold px-2 py-1 rounded border bg-indigo-50 text-indigo-600 border-indigo-100 uppercase">{questionType.replace('_', ' ')}</span>
                 </div>
                 <div className="p-5">
-                  <div className="text-gray-800 text-sm leading-relaxed font-medium mb-4 text-left text-justify whitespace-pre-wrap">
-                    <Latex>{(questionText || 'Belum ada pertanyaan...').replace(/</g, ' < ')}</Latex>
+                  <div className="text-gray-800 text-sm leading-relaxed font-medium mb-4 text-left text-justify">
+                    <MathText>{questionText || 'Belum ada pertanyaan...'}</MathText>
                   </div>
                   {questionImage && <img src={questionImage} className="w-full h-auto my-6 select-none object-contain" alt="Soal"/>}
                   <div className="space-y-2 text-sm">
@@ -1630,7 +1683,7 @@ const UTBKAdminApp = () => {
                           return (
                             <div key={i} className={`p-3 rounded-lg border flex gap-3 items-center ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
                               <div className={`w-6 h-6 flex items-center justify-center font-bold rounded text-xs ${isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{label}</div>
-                              <div className="font-medium text-gray-700"><Latex>{(opt || `Pilihan ${label}`).replace(/</g, ' < ')}</Latex></div>
+                              <div className="font-medium text-gray-700"><MathText>{opt || `Pilihan ${label}`}</MathText></div>
                               {isCorrect && <CheckCircle2 size={16} className="text-green-500 ml-auto" />}
                             </div>
                           );
